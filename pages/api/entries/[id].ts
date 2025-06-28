@@ -5,7 +5,13 @@ import {
 import { getServerSession } from 'next-auth/next';
 import { z } from 'zod';
 
-import { prisma } from '@/lib/database';
+import {
+  deleteEntry,
+  findEntryById,
+  findPatientById,
+  findUserByEmail,
+  updateEntry,
+} from '@/lib/database';
 
 import NextAuth from '../auth/[...nextauth]';
 
@@ -33,9 +39,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     case 'GET':
       return getEntry(req, res, userId, id);
     case 'PUT':
-      return updateEntry(req, res, userId, id);
+      return updateEntryHandler(req, res, userId, id);
     case 'DELETE':
-      return deleteEntry(req, res, userId, id);
+      return deleteEntryHandler(req, res, userId, id);
     default:
       return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -46,28 +52,21 @@ async function getEntry(req: NextApiRequest, res: NextApiResponse, userId: strin
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = await prisma.user.findUnique({
-        where: { email: userId }
-      });
+      const user = findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    const entry = await prisma.entry.findFirst({
-      where: { 
-        id: entryId,
-        patient: {
-          userId: actualUserId
-        }
-      },
-      include: {
-        patient: true,
-      },
-    });
-
+    const entry = findEntryById(entryId);
     if (!entry) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
+
+    // Verify the entry belongs to a patient owned by the user
+    const patient = findPatientById(entry.patientId);
+    if (!patient || patient.userId !== actualUserId) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
@@ -93,14 +92,12 @@ async function getEntry(req: NextApiRequest, res: NextApiResponse, userId: strin
   }
 }
 
-async function updateEntry(req: NextApiRequest, res: NextApiResponse, userId: string, entryId: string) {
+async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, userId: string, entryId: string) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = await prisma.user.findUnique({
-        where: { email: userId }
-      });
+      const user = findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -108,16 +105,13 @@ async function updateEntry(req: NextApiRequest, res: NextApiResponse, userId: st
     }
 
     // Verify the entry belongs to a patient owned by the user
-    const existingEntry = await prisma.entry.findFirst({
-      where: { 
-        id: entryId,
-        patient: {
-          userId: actualUserId
-        }
-      },
-    });
-
+    const existingEntry = findEntryById(entryId);
     if (!existingEntry) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
+
+    const patient = findPatientById(existingEntry.patientId);
+    if (!patient || patient.userId !== actualUserId) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
@@ -125,66 +119,48 @@ async function updateEntry(req: NextApiRequest, res: NextApiResponse, userId: st
     const updateEntrySchema = z.discriminatedUnion('entryType', [
       z.object({
         entryType: z.literal('glucose'),
-        value: z.string().refine((val) => {
-          const num = parseFloat(val);
-          return !isNaN(num) && num >= 40 && num <= 600;
-        }, 'Glucose must be between 40 and 600 mg/dL'),
-        units: z.enum(['mg/dL', 'mmol/L']),
-        occurredAt: z.preprocess((val) => {
-          if (typeof val === 'string') {
-            return new Date(val);
-          }
-          return val;
-        }, z.date({
-          required_error: "Date and time is required",
-          invalid_type_error: "Invalid date format",
-        })),
+        value: z.string().min(1, 'Glucose value is required'),
+        occurredAt: z.string().or(z.date()),
       }),
       z.object({
         entryType: z.literal('meal'),
         value: z.string().min(1, 'Meal description is required'),
-        occurredAt: z.preprocess((val) => {
-          if (typeof val === 'string') {
-            return new Date(val);
-          }
-          return val;
-        }, z.date({
-          required_error: "Date and time is required",
-          invalid_type_error: "Invalid date format",
-        })),
+        occurredAt: z.string().or(z.date()),
       }),
       z.object({
         entryType: z.literal('insulin'),
-        value: z.string().refine((val) => {
-          const num = parseFloat(val);
-          return !isNaN(num) && num >= 0 && num <= 50;
-        }, 'Insulin dose must be between 0 and 50 IU'),
-        units: z.literal('IU'),
-        medicationBrand: z.string().min(1, 'Medication brand is required'),
-        occurredAt: z.preprocess((val) => {
-          if (typeof val === 'string') {
-            return new Date(val);
-          }
-          return val;
-        }, z.date({
-          required_error: "Date and time is required",
-          invalid_type_error: "Invalid date format",
-        })),
+        value: z.string().min(1, 'Insulin dose is required'),
+        units: z.string().min(1, 'Units are required for insulin'),
+        medicationBrand: z.string().optional(),
+        occurredAt: z.string().or(z.date()),
       }),
     ]);
 
     const validatedData = updateEntrySchema.parse(req.body);
 
-    const updatedEntry = await prisma.entry.update({
-      where: { id: entryId },
-      data: {
-        entryType: validatedData.entryType,
-        value: validatedData.value,
-        units: 'units' in validatedData ? validatedData.units : undefined,
-        medicationBrand: 'medicationBrand' in validatedData ? validatedData.medicationBrand : undefined,
-        occurredAt: validatedData.occurredAt,
-      },
-    });
+    // Convert occurredAt to Date if it's a string
+    const occurredAt = validatedData.occurredAt instanceof Date 
+      ? validatedData.occurredAt 
+      : new Date(validatedData.occurredAt);
+
+    // Prepare update data
+    const updateData: any = {
+      entryType: validatedData.entryType,
+      value: validatedData.value,
+      occurredAt,
+    };
+
+    // Add insulin-specific fields if present
+    if (validatedData.entryType === 'insulin') {
+      updateData.units = validatedData.units;
+      updateData.medicationBrand = validatedData.medicationBrand;
+    }
+
+    const updatedEntry = updateEntry(entryId, updateData);
+
+    if (!updatedEntry) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
 
     // Transform for response
     const transformedEntry = {
@@ -195,7 +171,6 @@ async function updateEntry(req: NextApiRequest, res: NextApiResponse, userId: st
       medicationBrand: updatedEntry.medicationBrand,
       occurredAt: updatedEntry.occurredAt,
       createdAt: updatedEntry.createdAt,
-      patientId: updatedEntry.patientId,
     };
 
     res.status(200).json({
@@ -205,23 +180,21 @@ async function updateEntry(req: NextApiRequest, res: NextApiResponse, userId: st
     });
   } catch (error) {
     console.error('Error updating entry:', error);
-    
+
     if (error instanceof Error) {
       return res.status(400).json({ error: error.message });
     }
-    
+
     res.status(500).json({ error: 'Failed to update entry' });
   }
 }
 
-async function deleteEntry(req: NextApiRequest, res: NextApiResponse, userId: string, entryId: string) {
+async function deleteEntryHandler(req: NextApiRequest, res: NextApiResponse, userId: string, entryId: string) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = await prisma.user.findUnique({
-        where: { email: userId }
-      });
+      const user = findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -229,22 +202,21 @@ async function deleteEntry(req: NextApiRequest, res: NextApiResponse, userId: st
     }
 
     // Verify the entry belongs to a patient owned by the user
-    const entry = await prisma.entry.findFirst({
-      where: { 
-        id: entryId,
-        patient: {
-          userId: actualUserId
-        }
-      },
-    });
-
+    const entry = findEntryById(entryId);
     if (!entry) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
-    await prisma.entry.delete({
-      where: { id: entryId },
-    });
+    const patient = findPatientById(entry.patientId);
+    if (!patient || patient.userId !== actualUserId) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
+
+    const success = deleteEntry(entryId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
 
     res.status(200).json({
       success: true,

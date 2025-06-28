@@ -3,11 +3,14 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 
 import { comparePassword } from '@/lib/auth';
-import { prisma } from '@/lib/database';
-import { PrismaAdapter } from '@auth/prisma-adapter';
+import {
+  createUser,
+  findUserByEmail,
+} from '@/lib/database';
+import { CustomAdapter } from '@/lib/nextauth-adapter';
 
 export default NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter: CustomAdapter(),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -25,9 +28,7 @@ export default NextAuth({
         }
 
         try {
-          const user = await prisma.user.findUnique({
-            where: { email: credentials.email }
-          });
+          const user = findUserByEmail(credentials.email);
 
           if (!user || !user.password) {
             return null;
@@ -76,19 +77,15 @@ export default NextAuth({
         }
         
         // Check if user exists, if not create them
-        const existingUser = await prisma.user.findUnique({
-          where: { email: user.email }
-        });
+        const existingUser = findUserByEmail(user.email);
 
         if (!existingUser) {
           // Create new user from Google OAuth
-          await prisma.user.create({
-            data: {
-              email: user.email,
-              name: user.name || '',
-              image: user.image || '',
-              emailVerified: new Date(),
-            }
+          createUser({
+            email: user.email,
+            name: user.name || '',
+            image: user.image || '',
+            emailVerified: new Date(),
           });
         }
       }

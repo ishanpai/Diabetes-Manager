@@ -23,16 +23,7 @@ export function getGlucoseStatusColor(status: 'low' | 'normal' | 'high'): 'error
 }
 
 export function getDiabetesTypeColor(type: string): 'primary' | 'secondary' | 'info' | 'default' | 'error' | 'warning' | 'success' {
-  switch (type) {
-    case 'Type 1':
-      return 'error';
-    case 'Type 2':
-      return 'primary';
-    case 'Gestational':
-      return 'secondary';
-    default:
-      return 'default';
-  }
+  return 'default';
 }
 
 export function formatPatientName(patient: Patient | PatientWithStats): string {

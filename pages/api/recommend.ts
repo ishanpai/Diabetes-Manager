@@ -2,16 +2,20 @@ import {
   NextApiRequest,
   NextApiResponse,
 } from 'next';
-import { getServerSession } from 'next-auth';
-import OpenAI from 'openai';
+import { getServerSession } from 'next-auth/next';
 import { z } from 'zod';
 
-import { prisma } from '@/lib/database';
+import {
+  createRecommendation,
+  findEntriesByPatientId,
+  findPatientById,
+  findUserByEmail,
+} from '@/lib/database';
 
 import NextAuth from './auth/[...nextauth]';
 
 // Initialize OpenAI client
-const openai = new OpenAI({
+const openai = new (require('openai')).default({
   apiKey: process.env.MODEL_API_KEY,
 });
 
@@ -34,12 +38,30 @@ function formatLocalTime(date: Date): string {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const session = await getServerSession(req, res, NextAuth);
+
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Access user ID from session - handle both possible structures
+  const userId = (session as any).user?.id || (session as any).user?.email;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID not found' });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  return createRecommendationHandler(req, res, userId);
+}
+
+async function createRecommendationHandler(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
-    console.log('Recommendation API called with body:', req.body);
+    // Debug: log the incoming request body
+    console.log('Incoming /api/recommend request body:', req.body);
     
     // Set up SSE headers for streaming
     res.writeHead(200, {
@@ -63,44 +85,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.write(`data: ${JSON.stringify({ type: 'result', data })}\n\n`);
       res.end();
     };
-
-    // Check authentication
-    sendProgress('gathering-data', 'Checking authentication...');
-    await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for visibility
-    const session = await getServerSession(req, res, NextAuth);
-    console.log('Session:', session);
     
-    if (!session) {
-      return sendError('Not authenticated');
-    }
-
-    const sessionUserId = (session as any).user?.id || (session as any).user?.email;
-    console.log('Session User ID:', sessionUserId);
-
-    if (!sessionUserId) {
-      return sendError('User ID not found in session');
-    }
-
-    // Get the actual user ID from the database
-    sendProgress('gathering-data', 'Finding user...');
-    await new Promise(resolve => setTimeout(resolve, 300));
-    let actualUserId = sessionUserId;
-    if (sessionUserId.includes('@')) {
-      // If it's an email, find the user first
-      const user = await prisma.user.findUnique({
-        where: { email: sessionUserId }
-      });
+    // If userId is an email, find the user first
+    let actualUserId = userId;
+    if (userId.includes('@')) {
+      const user = findUserByEmail(userId);
       if (!user) {
         return sendError('User not found');
       }
       actualUserId = user.id;
     }
-    console.log('Actual User ID:', actualUserId);
 
     // Validate request body
-    sendProgress('gathering-data', 'Validating request...');
-    await new Promise(resolve => setTimeout(resolve, 200));
-    const validatedData = recommendSchema.parse(req.body);
+    let validatedData;
+    try {
+      validatedData = recommendSchema.parse(req.body);
+    } catch (validationError) {
+      console.error('Validation error in /api/recommend:', validationError);
+      return sendError('Validation failed');
+    }
+
     const { patientId, targetTime } = validatedData;
     console.log('Validated data:', { patientId, targetTime });
 
@@ -108,38 +112,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const targetDateTime = targetTime ? new Date(targetTime) : new Date();
     console.log('Target datetime:', targetDateTime);
 
+    // Check authentication and send progress
+    sendProgress('gathering-data', 'Checking authentication...');
+    await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for visibility
+
     // Verify patient exists and belongs to user
     sendProgress('gathering-data', 'Loading patient data...');
-    await new Promise(resolve => setTimeout(resolve, 400));
-    const patient = await prisma.patient.findFirst({
-      where: {
-        id: patientId,
-        userId: actualUserId,
-      },
-      include: {
-        entries: {
-          where: {
-            occurredAt: {
-              gte: new Date(Date.now() - 72 * 60 * 60 * 1000), // Last 72 hours
-            },
-          },
-          orderBy: {
-            occurredAt: 'asc',
-          },
-        },
-      },
-    });
-
-    console.log('Patient found:', !!patient);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const patient = findPatientById(patientId);
     if (!patient) {
       return sendError('Patient not found');
     }
 
+    if (patient.userId !== actualUserId) {
+      return sendError('Patient not found');
+    }
+
     // Get recent entries for the last 72 hours
-    const recentEntries = patient.entries;
+    sendProgress('gathering-data', 'Loading recent entries...');
+    await new Promise(resolve => setTimeout(resolve, 400));
+    const entries = findEntriesByPatientId(patientId);
+    const recentEntries = entries.filter(entry => 
+      new Date(entry.occurredAt) >= new Date(Date.now() - 72 * 60 * 60 * 1000)
+    );
     console.log('Recent entries count:', recentEntries.length);
     sendProgress('gathering-data', `Found ${recentEntries.length} recent entries`);
-    await new Promise(resolve => setTimeout(resolve, 300));
 
     // Build the prompt for the AI model
     sendProgress('building-prompt', 'Building AI prompt...');
@@ -158,18 +155,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Parse and save the recommendation
     sendProgress('parsing-response', 'Processing recommendation...');
     await new Promise(resolve => setTimeout(resolve, 400));
-    const savedRecommendation = await prisma.recommendation.create({
-      data: {
-        patientId,
-        prompt,
-        response: aiRecommendation.reasoning,
-        doseUnits: aiRecommendation.doseUnits,
-        reasoning: aiRecommendation.reasoning,
-        safetyNotes: aiRecommendation.safetyNotes,
-        confidence: aiRecommendation.confidence,
-        recommendedMonitoring: aiRecommendation.recommendedMonitoring,
-        targetTime: targetDateTime,
-      },
+    const savedRecommendation = createRecommendation({
+      patientId,
+      prompt,
+      response: aiRecommendation.reasoning,
+      doseUnits: aiRecommendation.doseUnits,
+      medicationName: aiRecommendation.medicationName,
+      reasoning: aiRecommendation.reasoning,
+      safetyNotes: aiRecommendation.safetyNotes,
+      confidence: aiRecommendation.confidence,
+      recommendedMonitoring: aiRecommendation.recommendedMonitoring,
+      targetTime: targetDateTime,
     });
 
     console.log('Recommendation saved to database');
@@ -180,6 +176,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: savedRecommendation.id,
       patientId: savedRecommendation.patientId,
       doseUnits: savedRecommendation.doseUnits,
+      medicationName: savedRecommendation.medicationName,
       reasoning: savedRecommendation.reasoning,
       safetyNotes: savedRecommendation.safetyNotes,
       confidence: savedRecommendation.confidence,
@@ -212,10 +209,17 @@ function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Dat
     medications = [];
   }
 
+  // Calculate age
+  const age = Math.floor((new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+
+  // Analyze medication timing patterns from recent history
+  const insulinEntries = entries.filter(entry => entry.entryType === 'insulin');
+  const medicationPatterns = analyzeMedicationPatterns(insulinEntries, targetTime);
+
   const patientInfo = `
 <PATIENT_INFO>
 - Name: ${patient.name}
-- Age: ${patient.age} years old
+- Age: ${age} years old
 - Diabetes Type: ${patient.diabetesType}
 - Lifestyle: ${patient.lifestyle || 'Not specified'}
 - Activity Level: ${patient.activityLevel || 'Not specified'}
@@ -233,7 +237,7 @@ Target Administration Time: ${formatLocalTime(targetTime)}
     ? `<RECENT_HISTORY>
 Recent History (Last 72 hours):
 ${entries.map(entry => `<${entry.entryType.toUpperCase()}>
-    <VALUE>${entry.value}${entry.units ? ` ${entry.units}` : ''}</VALUE>
+    <VALUE>${entry.value}${entry.units ? ` ${entry.units}` : ''} ${entry.medicationBrand ? `(${entry.medicationBrand})` : ''}</VALUE>
     <OCCURRED_AT>${formatLocalTime(entry.occurredAt)}</OCCURRED_AT>
     </${entry.entryType.toUpperCase()}>`).join('\n')}
 </RECENT_HISTORY>`
@@ -241,9 +245,16 @@ ${entries.map(entry => `<${entry.entryType.toUpperCase()}>
 No recent entries in the last 72 hours.
 </RECENT_HISTORY>`;
 
+  const patternAnalysis = medicationPatterns ? `
+<MEDICATION_PATTERN_ANALYSIS>
+Based on recent insulin administration patterns:
+${medicationPatterns}
+</MEDICATION_PATTERN_ANALYSIS>
+` : '';
+
   return `
 <TASK>
-You are a medical AI assistant specializing in diabetes management and insulin dosing recommendations. Your task is to analyze patient data and provide evidence-based insulin dose recommendations for administration at a specific target time.
+You are a medical AI assistant specializing in diabetes management and insulin dosing recommendations. Your task is to analyze patient data and provide evidence-based insulin dose recommendations for administration at a specific target time, including which specific medication to use based on timing patterns and patient history.
 </TASK>
 
 <INSTRUCTIONS>
@@ -258,6 +269,11 @@ Consider the following factors when making your recommendation:
 6. Time until administration and potential glucose changes
 7. Patient's lifestyle and activity level
 8. Safety considerations to minimize risk of hypoglycemia or hyperglycemia
+9. MEDICATION SELECTION: Analyze the patient's recent insulin administration patterns to determine which medication is most appropriate for this specific time of day and situation. Look for:
+   - Time-based patterns (e.g., specific medications used at specific times)
+   - Meal-related patterns (e.g., rapid-acting before meals, long-acting at night)
+   - Consistency in medication choice for similar situations
+   - The patient's usual medication schedule and preferences
 
 Always prioritize patient safety and be conservative in your recommendations.
 </INSTRUCTIONS>
@@ -268,6 +284,8 @@ ${patientInfo}
 ${targetTimeInfo}
 
 ${recentHistory}
+
+${patternAnalysis}
 </CONTEXT>
 
 <RESPONSE_FORMAT>
@@ -275,6 +293,7 @@ Provide your recommendation in the following exact JSON format. Do not include a
 
 {
   "doseUnits": <number>,
+  "medicationName": "<specific medication name from patient's usual medications>",
   "reasoning": "<detailed explanation of your recommendation>",
   "safetyNotes": "<any important safety warnings or considerations>",
   "confidence": "<high|medium|low>",
@@ -283,7 +302,8 @@ Provide your recommendation in the following exact JSON format. Do not include a
 
 Where:
 - doseUnits: Recommended insulin dose in IU (International Units)
-- reasoning: Detailed explanation of your thought process and considerations
+- medicationName: The specific medication name from the patient's usual medications, chosen based on timing patterns and patient history
+- reasoning: Detailed explanation of your thought process, including why you chose this specific medication based on timing patterns
 - safetyNotes: Any important safety warnings, contraindications, or special considerations
 - confidence: Your confidence level in this recommendation (high/medium/low)
 - recommendedMonitoring: Specific recommendations for glucose monitoring after administration
@@ -292,7 +312,8 @@ Where:
 <GOOD_EXAMPLE>
 {
   "doseUnits": 12,
-  "reasoning": "Based on recent glucose reading of 180 mg/dL from 2 hours ago and the patient's usual dose pattern of 10-14 IU, a dose of 12 IU is recommended. The patient's sedentary lifestyle suggests slower glucose metabolism, and the last meal was 3 hours ago, reducing immediate post-meal insulin needs.",
+  "medicationName": "Actrapid",
+  "reasoning": "Based on recent glucose reading of 180 mg/dL from 2 hours ago and the patient's usual dose pattern of 10-14 IU, a dose of 12 IU is recommended. The patient's sedentary lifestyle suggests slower glucose metabolism, and the last meal was 3 hours ago, reducing immediate post-meal insulin needs. Actrapid is chosen as it's consistently used by this patient for morning and lunchtime insulin administration, and the target time (2:00 PM) aligns with the patient's typical lunchtime insulin pattern.",
   "safetyNotes": "Monitor glucose 1 hour after administration. Have fast-acting carbohydrates available. This dose is within the patient's usual range but higher than recent doses - monitor closely.",
   "confidence": "medium",
   "recommendedMonitoring": "Check glucose at 1 hour and 2 hours post-administration. Monitor for signs of hypoglycemia, especially if patient is more active than usual."
@@ -302,6 +323,7 @@ Where:
 <BAD_EXAMPLE>
 {
   "doseUnits": 25,
+  "medicationName": "Insulin",
   "reasoning": "Patient needs more insulin because glucose is high",
   "safetyNotes": "Be careful",
   "confidence": "high",
@@ -310,9 +332,77 @@ Where:
 </BAD_EXAMPLE>
 
 <FINAL_INSTRUCTIONS>
-Remember: This is a medical recommendation that should be reviewed by healthcare professionals before administration. Provide detailed, evidence-based reasoning and comprehensive safety considerations like in the good example, not brief responses like in the bad example.
+Remember: This is a medical recommendation that should be reviewed by healthcare professionals before administration. Provide detailed, evidence-based reasoning and comprehensive safety considerations like in the good example, not brief responses like in the bad example. Always specify the exact medication name from the patient's usual medications, and explain your medication choice based on timing patterns and patient history.
 </FINAL_INSTRUCTIONS>
 `;
+}
+
+function analyzeMedicationPatterns(insulinEntries: any[], targetTime: Date): string {
+  if (insulinEntries.length === 0) {
+    return "No recent insulin administration patterns available.";
+  }
+
+  // Group entries by time of day
+  const morningEntries = insulinEntries.filter(entry => {
+    const hour = new Date(entry.occurredAt).getHours();
+    return hour >= 6 && hour < 12;
+  });
+  
+  const afternoonEntries = insulinEntries.filter(entry => {
+    const hour = new Date(entry.occurredAt).getHours();
+    return hour >= 12 && hour < 18;
+  });
+  
+  const eveningEntries = insulinEntries.filter(entry => {
+    const hour = new Date(entry.occurredAt).getHours();
+    return hour >= 18 || hour < 6;
+  });
+
+  let patterns = [];
+  
+  if (morningEntries.length > 0) {
+    const morningMeds = morningEntries.map(e => e.medicationBrand).filter(Boolean);
+    const mostCommonMorning = getMostCommon(morningMeds);
+    if (mostCommonMorning) {
+      patterns.push(`Morning (6 AM - 12 PM): Primarily uses ${mostCommonMorning} (${morningEntries.length} entries)`);
+    }
+  }
+  
+  if (afternoonEntries.length > 0) {
+    const afternoonMeds = afternoonEntries.map(e => e.medicationBrand).filter(Boolean);
+    const mostCommonAfternoon = getMostCommon(afternoonMeds);
+    if (mostCommonAfternoon) {
+      patterns.push(`Afternoon (12 PM - 6 PM): Primarily uses ${mostCommonAfternoon} (${afternoonEntries.length} entries)`);
+    }
+  }
+  
+  if (eveningEntries.length > 0) {
+    const eveningMeds = eveningEntries.map(e => e.medicationBrand).filter(Boolean);
+    const mostCommonEvening = getMostCommon(eveningMeds);
+    if (mostCommonEvening) {
+      patterns.push(`Evening/Night (6 PM - 6 AM): Primarily uses ${mostCommonEvening} (${eveningEntries.length} entries)`);
+    }
+  }
+
+  // Analyze dose patterns
+  const recentDoses = insulinEntries.slice(0, 5).map(e => parseFloat(e.value)).filter(d => !isNaN(d));
+  if (recentDoses.length > 0) {
+    const avgDose = recentDoses.reduce((a, b) => a + b, 0) / recentDoses.length;
+    patterns.push(`Recent dose range: ${Math.min(...recentDoses)}-${Math.max(...recentDoses)} IU (average: ${avgDose.toFixed(1)} IU)`);
+  }
+
+  return patterns.length > 0 ? patterns.join('\n') : "Limited pattern data available.";
+}
+
+function getMostCommon(arr: string[]): string | null {
+  if (arr.length === 0) return null;
+  
+  const counts: { [key: string]: number } = {};
+  arr.forEach(item => {
+    counts[item] = (counts[item] || 0) + 1;
+  });
+  
+  return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
 }
 
 async function getAIRecommendation(prompt: string) {
@@ -350,6 +440,7 @@ async function getAIRecommendation(prompt: string) {
       const parsed = JSON.parse(responseContent);
       return {
         doseUnits: parsed.doseUnits || 8,
+        medicationName: parsed.medicationName || 'Unknown',
         reasoning: parsed.reasoning || 'No reasoning provided',
         safetyNotes: parsed.safetyNotes || '',
         confidence: parsed.confidence || 'medium',
@@ -365,6 +456,7 @@ async function getAIRecommendation(prompt: string) {
 
       return {
         doseUnits,
+        medicationName: 'Unknown',
         reasoning: responseContent,
         safetyNotes: 'Unable to parse structured response',
         confidence: 'low',

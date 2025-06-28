@@ -31,14 +31,17 @@ export function usePatients(): UsePatientsReturn {
       
       const result = await response.json();
       
-      if (result.success) {
-        setPatients(result.data.patients);
+      if (result.success && result.data) {
+        // Handle both old and new API response formats
+        const patientsData = result.data.patients || result.data;
+        setPatients(patientsData || []);
       } else {
         throw new Error(result.error || 'Failed to fetch patients');
       }
     } catch (err) {
       console.error('Error fetching patients:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
+      setPatients([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -49,10 +52,10 @@ export function usePatients(): UsePatientsReturn {
   }, []);
 
   return {
-    patients,
+    patients: patients || [],
     loading,
     error,
     refetch: fetchPatients,
-    totalPatients: patients.length,
+    totalPatients: (patients || []).length,
   };
 } 

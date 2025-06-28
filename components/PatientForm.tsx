@@ -32,7 +32,7 @@ import {
 
 interface PatientFormProps {
   patient?: PatientWithEntries | null;
-  onSubmit: (data: PatientFormData) => Promise<void>;
+  onSubmit: (data: any) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
   error?: string | null;
@@ -65,6 +65,7 @@ export function PatientForm({
   // Load patient data when editing
   useEffect(() => {
     if (patient) {
+      
       setFormData({
         name: patient.name,
         dob: patient.dob instanceof Date 
@@ -111,12 +112,21 @@ export function PatientForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!validateForm()) {
       return;
     }
 
-    await onSubmit(formData);
+    // Convert medications array to JSON string for backend
+    const medicationsJson = JSON.stringify(formData.usualMedications);
+    
+    const backendData = {
+      ...formData,
+      diabetesType: formData.diabetesType,
+      usualMedications: medicationsJson
+    };
+
+    await onSubmit(backendData);
   };
 
   const handleInputChange = (field: keyof PatientFormData, value: any) => {
@@ -213,10 +223,10 @@ export function PatientForm({
                     onChange={(e) => handleInputChange('diabetesType', e.target.value)}
                   >
                     <MenuItem value="">Select diabetes type</MenuItem>
-                    <MenuItem value="Type 1">Type 1</MenuItem>
-                    <MenuItem value="Type 2">Type 2</MenuItem>
-                    <MenuItem value="Gestational">Gestational</MenuItem>
-                    <MenuItem value="Other">Other</MenuItem>
+                    <MenuItem value="type1">Type 1</MenuItem>
+                    <MenuItem value="type2">Type 2</MenuItem>
+                    <MenuItem value="gestational">Gestational</MenuItem>
+                    <MenuItem value="other">Other</MenuItem>
                   </Select>
                   <FormHelperText>{errors.diabetesType}</FormHelperText>
                 </FormControl>

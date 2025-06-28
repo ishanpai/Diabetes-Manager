@@ -4,7 +4,10 @@ import {
 } from 'next';
 
 import { hashPassword } from '@/lib/auth';
-import { prisma } from '@/lib/database';
+import {
+  createUser,
+  findUserByEmail,
+} from '@/lib/database';
 import { signupSchema } from '@/lib/validation';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -16,9 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { name, email, password } = signupSchema.parse(req.body);
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const existingUser = findUserByEmail(email);
 
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists with this email' });
@@ -28,24 +29,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const hashedPassword = await hashPassword(password);
 
     // Create user
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-      },
+    const user = createUser({
+      name,
+      email,
+      password: hashedPassword,
     });
 
     res.status(201).json({
       success: true,
       message: 'User created successfully',
-      user,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        createdAt: user.createdAt,
+      },
     });
   } catch (error) {
     console.error('Signup error:', error);

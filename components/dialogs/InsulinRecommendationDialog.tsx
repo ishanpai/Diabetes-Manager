@@ -299,6 +299,11 @@ export function InsulinRecommendationDialog({
                   <Typography variant="h4" color="primary" fontWeight={600}>
                     {recommendation.doseUnits} IU
                   </Typography>
+                  {recommendation.medicationName && (
+                    <Typography variant="h6" color="text.secondary">
+                      of {recommendation.medicationName}
+                    </Typography>
+                  )}
                   <Chip label="Recommended" color="primary" variant="outlined" />
                   {recommendation.confidence && (
                     <Chip 
@@ -366,16 +371,17 @@ export function InsulinRecommendationDialog({
                         onAddEntry('insulin', {
                           value: recommendation.doseUnits?.toString() || '',
                           units: 'IU',
+                          medicationBrand: recommendation.medicationName || '',
                           occurredAt: targetTime,
                         });
                         handleClose();
                       }}
                       sx={{ mb: 1 }}
                     >
-                      Add {recommendation.doseUnits} IU as Entry
+                      Add {recommendation.doseUnits} IU {recommendation.medicationName ? `of ${recommendation.medicationName}` : ''} as Entry
                     </Button>
                     <Typography variant="caption" color="text.secondary" display="block" textAlign="center">
-                      You can modify the dose in the entry form if needed
+                      You can modify the dose and medication in the entry form if needed
                     </Typography>
                   </Box>
                 )}

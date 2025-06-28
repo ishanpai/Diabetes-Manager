@@ -141,6 +141,7 @@ export interface Recommendation {
   prompt: string;
   response: string;
   doseUnits?: number;
+  medicationName?: string;
   reasoning?: string;
   safetyNotes?: string;
   confidence?: 'high' | 'medium' | 'low';

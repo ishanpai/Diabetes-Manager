@@ -3,11 +3,14 @@ import {
   NextApiResponse,
 } from 'next';
 import { getServerSession } from 'next-auth/next';
+import { z } from 'zod';
 
-import { prisma } from '@/lib/database';
-import { calculateAge } from '@/lib/dateUtils';
-import { patientSchema } from '@/lib/validation';
-import { parsePatientMedications } from '@/utils/patient';
+import {
+  deletePatient,
+  findPatientById,
+  findUserByEmail,
+  updatePatient,
+} from '@/lib/database';
 
 import NextAuth from '../auth/[...nextauth]';
 
@@ -35,9 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     case 'GET':
       return getPatient(req, res, userId, id);
     case 'PUT':
-      return updatePatient(req, res, userId, id);
+      return updatePatientHandler(req, res, userId, id);
     case 'DELETE':
-      return deletePatient(req, res, userId, id);
+      return deletePatientHandler(req, res, userId, id);
     default:
       return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -48,47 +51,45 @@ async function getPatient(req: NextApiRequest, res: NextApiResponse, userId: str
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = await prisma.user.findUnique({
-        where: { email: userId }
-      });
+      const user = findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    const patient = await prisma.patient.findFirst({
-      where: {
-        id: patientId,
-        userId: actualUserId
-      },
-      include: {
-        entries: {
-          orderBy: { occurredAt: 'desc' },
-          take: 10,
-        },
-        _count: {
-          select: { entries: true },
-        },
-      },
-    });
-
+    const patient = findPatientById(patientId);
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Parse the medications before sending to frontend
-    const parsedPatient = parsePatientMedications(patient);
+    // Verify the patient belongs to the user
+    if (patient.userId !== actualUserId) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
 
-    // Add calculated age to the response
-    const patientWithAge = {
-      ...parsedPatient,
-      age: calculateAge(parsedPatient.dob),
+    // Transform for response
+    let medications = [];
+    try {
+      medications = JSON.parse(patient.usualMedications || '[]');
+    } catch {
+      medications = [];
+    }
+    const transformedPatient = {
+      id: patient.id,
+      name: patient.name,
+      dob: patient.dob,
+      diabetesType: patient.diabetesType,
+      lifestyle: patient.lifestyle,
+      activityLevel: patient.activityLevel,
+      usualMedications: medications,
+      createdAt: patient.createdAt,
+      updatedAt: patient.updatedAt,
     };
 
     res.status(200).json({
       success: true,
-      data: patientWithAge,
+      data: transformedPatient,
     });
   } catch (error) {
     console.error('Error fetching patient:', error);
@@ -96,60 +97,97 @@ async function getPatient(req: NextApiRequest, res: NextApiResponse, userId: str
   }
 }
 
-async function updatePatient(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
+async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
   try {
-    const validatedData = patientSchema.parse(req.body);
-
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = await prisma.user.findUnique({
-        where: { email: userId }
-      });
+      const user = findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    const patient = await prisma.patient.findFirst({
-      where: {
-        id: patientId,
-        userId: actualUserId
-      },
-    });
-
-    if (!patient) {
+    // Verify the patient belongs to the user
+    const existingPatient = findPatientById(patientId);
+    if (!existingPatient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    const updatedPatient = await prisma.patient.update({
-      where: { id: patientId },
-      data: {
-        ...validatedData,
-        dob: validatedData.dob instanceof Date ? validatedData.dob : new Date(validatedData.dob),
-        usualMedications: JSON.stringify(validatedData.usualMedications),
-      },
-      include: {
-        entries: true,
-        _count: {
-          select: { entries: true },
-        },
-      },
+    if (existingPatient.userId !== actualUserId) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    // Create a validation schema
+    const updatePatientSchema = z.object({
+      name: z.string().min(1, 'Name is required').optional(),
+      dob: z.string().or(z.date()).optional(),
+      diabetesType: z.enum(['type1', 'type2', 'gestational', 'other']).optional(),
+      lifestyle: z.string().optional(),
+      activityLevel: z.string().optional(),
+      usualMedications: z.string().optional(),
     });
 
-    // Parse the medications before sending to frontend
-    const parsedPatient = parsePatientMedications(updatedPatient);
+    const validatedData = updatePatientSchema.parse(req.body);
 
-    // Add calculated age to the response
-    const patientWithAge = {
-      ...parsedPatient,
-      age: calculateAge(parsedPatient.dob),
+    // Prepare update data
+    const updateData: any = {};
+
+    if (validatedData.name !== undefined) {
+      updateData.name = validatedData.name;
+    }
+
+    if (validatedData.dob !== undefined) {
+      updateData.dob = validatedData.dob instanceof Date 
+        ? validatedData.dob 
+        : new Date(validatedData.dob);
+    }
+
+    if (validatedData.diabetesType !== undefined) {
+      updateData.diabetesType = validatedData.diabetesType;
+    }
+
+    if (validatedData.lifestyle !== undefined) {
+      updateData.lifestyle = validatedData.lifestyle;
+    }
+
+    if (validatedData.activityLevel !== undefined) {
+      updateData.activityLevel = validatedData.activityLevel;
+    }
+
+    if (validatedData.usualMedications !== undefined) {
+      updateData.usualMedications = validatedData.usualMedications;
+    }
+
+    const updatedPatient = updatePatient(patientId, updateData);
+
+    if (!updatedPatient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    // Transform for response
+    let updatedMedications = [];
+    try {
+      updatedMedications = JSON.parse(updatedPatient.usualMedications || '[]');
+    } catch {
+      updatedMedications = [];
+    }
+    const transformedUpdatedPatient = {
+      id: updatedPatient.id,
+      name: updatedPatient.name,
+      dob: updatedPatient.dob,
+      diabetesType: updatedPatient.diabetesType,
+      lifestyle: updatedPatient.lifestyle,
+      activityLevel: updatedPatient.activityLevel,
+      usualMedications: updatedMedications,
+      createdAt: updatedPatient.createdAt,
+      updatedAt: updatedPatient.updatedAt,
     };
 
     res.status(200).json({
       success: true,
-      data: patientWithAge,
+      data: transformedUpdatedPatient,
       message: 'Patient updated successfully',
     });
   } catch (error) {
@@ -163,34 +201,33 @@ async function updatePatient(req: NextApiRequest, res: NextApiResponse, userId: 
   }
 }
 
-async function deletePatient(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
+async function deletePatientHandler(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = await prisma.user.findUnique({
-        where: { email: userId }
-      });
+      const user = findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    const patient = await prisma.patient.findFirst({
-      where: {
-        id: patientId,
-        userId: actualUserId
-      },
-    });
-
+    // Verify the patient belongs to the user
+    const patient = findPatientById(patientId);
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    await prisma.patient.delete({
-      where: { id: patientId },
-    });
+    if (patient.userId !== actualUserId) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const success = deletePatient(patientId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
 
     res.status(200).json({
       success: true,

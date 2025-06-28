@@ -3,14 +3,14 @@ import {
   NextApiResponse,
 } from 'next';
 import { getServerSession } from 'next-auth/next';
+import { z } from 'zod';
 
-import { prisma } from '@/lib/database';
-import { calculateAge } from '@/lib/dateUtils';
-import { patientSchema } from '@/lib/validation';
 import {
-  parsePatientMedications,
-  parsePatientsMedications,
-} from '@/utils/patient';
+  createPatient,
+  findEntriesByPatientId,
+  findPatientsByUserId,
+  findUserByEmail,
+} from '@/lib/database';
 
 import NextAuth from '../auth/[...nextauth]';
 
@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     case 'GET':
       return getPatients(req, res, userId);
     case 'POST':
-      return createPatient(req, res, userId);
+      return createPatientHandler(req, res, userId);
     default:
       return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -43,44 +43,33 @@ async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: st
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = await prisma.user.findUnique({
-        where: { email: userId }
-      });
+      const user = findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    const patients = await prisma.patient.findMany({
-      where: { userId: actualUserId },
-      include: {
-        entries: {
-          orderBy: { occurredAt: 'desc' },
-          take: 1,
-        },
-        _count: {
-          select: {
-            entries: {
-              where: {
-                occurredAt: {
-                  gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
-                },
-              },
-            },
-          },
-        },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+    const patients = findPatientsByUserId(actualUserId);
 
-    // Parse medications for all patients
-    const patientsWithParsedMedications = parsePatientsMedications(patients);
-
-    // Transform the data to match our frontend expectations
-    const transformedPatients = patientsWithParsedMedications.map((patient: any) => {
-      const lastGlucoseEntry = patient.entries.find((entry: any) => entry.entryType === 'glucose');
+    // Transform for response with additional stats
+    const transformedPatients = patients.map(patient => {
+      // Get recent entries for stats
+      const entries = findEntriesByPatientId(patient.id, 10, 0);
+      const glucoseEntries = entries.filter(entry => entry.entryType === 'glucose');
+      const lastGlucoseEntry = glucoseEntries[0]; // Most recent first
       
+      // Calculate age
+      const age = Math.floor((new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      
+      // Parse medications
+      let medications = [];
+      try {
+        medications = JSON.parse(patient.usualMedications || '[]');
+      } catch (error) {
+        medications = [];
+      }
+
       return {
         id: patient.id,
         name: patient.name,
@@ -88,17 +77,17 @@ async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: st
         diabetesType: patient.diabetesType,
         lifestyle: patient.lifestyle,
         activityLevel: patient.activityLevel,
-        medications: patient.usualMedications, // Now using the parsed medications
+        usualMedications: medications,
         createdAt: patient.createdAt,
         updatedAt: patient.updatedAt,
-        age: calculateAge(patient.dob),
+        age,
         lastGlucoseReading: lastGlucoseEntry ? {
           value: parseInt(lastGlucoseEntry.value),
           occurredAt: lastGlucoseEntry.occurredAt,
           status: getGlucoseStatus(parseInt(lastGlucoseEntry.value)),
         } : undefined,
-        recentEntries: patient._count.entries,
-        lastEntryDate: patient.entries[0]?.occurredAt,
+        recentEntries: entries.length,
+        lastEntryDate: entries[0]?.occurredAt,
       };
     });
 
@@ -115,54 +104,62 @@ async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: st
   }
 }
 
-async function createPatient(req: NextApiRequest, res: NextApiResponse, userId: string) {
+async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
-    const validatedData = patientSchema.parse(req.body);
-
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = await prisma.user.findUnique({
-        where: { email: userId }
-      });
+      const user = findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    // Convert form data to database format
-    const patientData = {
-      ...validatedData,
-      dob: validatedData.dob instanceof Date ? validatedData.dob : new Date(validatedData.dob),
-      userId: actualUserId,
-      usualMedications: JSON.stringify(validatedData.usualMedications),
-    };
-
-    const patient = await prisma.patient.create({
-      data: patientData,
-      include: {
-        entries: true,
-        _count: {
-          select: { entries: true },
-        },
-      },
+    // Create a validation schema
+    const createPatientSchema = z.object({
+      name: z.string().min(1, 'Name is required'),
+      dob: z.string().or(z.date()),
+      diabetesType: z.enum(['type1', 'type2', 'gestational', 'other']),
+      lifestyle: z.string().optional(),
+      activityLevel: z.string().optional(),
+      usualMedications: z.string().optional(),
     });
 
-    // Parse medications and transform for response
-    const parsedPatient = parsePatientMedications(patient);
+    const validatedData = createPatientSchema.parse(req.body);
+
+    // Convert dates if they're strings
+    const dob = validatedData.dob instanceof Date 
+      ? validatedData.dob 
+      : new Date(validatedData.dob);
+
+    const patientData = {
+      userId: actualUserId,
+      name: validatedData.name,
+      dob,
+      diabetesType: validatedData.diabetesType,
+      lifestyle: validatedData.lifestyle || '',
+      activityLevel: validatedData.activityLevel || '',
+      usualMedications: validatedData.usualMedications || '[]',
+    };
+
+    const newPatient = createPatient(patientData);
+
+    if (!newPatient) {
+      return res.status(500).json({ error: 'Failed to create patient' });
+    }
+
+    // Transform for response
     const transformedPatient = {
-      id: parsedPatient.id,
-      name: parsedPatient.name,
-      dob: parsedPatient.dob,
-      diabetesType: parsedPatient.diabetesType,
-      lifestyle: parsedPatient.lifestyle,
-      activityLevel: parsedPatient.activityLevel,
-      medications: parsedPatient.usualMedications,
-      createdAt: parsedPatient.createdAt,
-      updatedAt: parsedPatient.updatedAt,
-      age: calculateAge(parsedPatient.dob),
-      recentEntries: 0,
+      id: newPatient.id,
+      name: newPatient.name,
+      dob: newPatient.dob,
+      diabetesType: newPatient.diabetesType,
+      lifestyle: newPatient.lifestyle,
+      activityLevel: newPatient.activityLevel,
+      usualMedications: newPatient.usualMedications,
+      createdAt: newPatient.createdAt,
+      updatedAt: newPatient.updatedAt,
     };
 
     res.status(201).json({
@@ -172,11 +169,11 @@ async function createPatient(req: NextApiRequest, res: NextApiResponse, userId: 
     });
   } catch (error) {
     console.error('Error creating patient:', error);
-    
+
     if (error instanceof Error) {
       return res.status(400).json({ error: error.message });
     }
-    
+
     res.status(500).json({ error: 'Failed to create patient' });
   }
 }
