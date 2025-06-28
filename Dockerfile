@@ -36,9 +36,6 @@ RUN adduser --system --uid 1001 nextjs
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
-# Copy the public folder
-COPY --from=builder /app/public ./public
-
 # Set the correct permission for prerender cache
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
