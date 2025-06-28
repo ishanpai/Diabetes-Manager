@@ -63,6 +63,19 @@ check_environment() {
         print_success "Generated JWT_SECRET: $JWT_SECRET"
     fi
     
+    if [ -z "$NEXTAUTH_SECRET" ]; then
+        print_warning "NEXTAUTH_SECRET not set, generating a random one..."
+        export NEXTAUTH_SECRET=$(openssl rand -base64 32)
+        print_success "Generated NEXTAUTH_SECRET: $NEXTAUTH_SECRET"
+    fi
+    
+    if [ -z "$NEXTAUTH_URL" ]; then
+        print_error "NEXTAUTH_URL environment variable is not set"
+        print_warning "Please set your production URL:"
+        print_warning "export NEXTAUTH_URL=https://yourdomain.com"
+        exit 1
+    fi
+    
     if [ -z "$MODEL_NAME" ]; then
         export MODEL_NAME="openai-4o-mini"
         print_status "Using default model: $MODEL_NAME"

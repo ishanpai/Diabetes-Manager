@@ -11,6 +11,8 @@ services:
       - MODEL_API_KEY=${MODEL_API_KEY}
       - MODEL_NAME=${MODEL_NAME:-openai-4o-mini}
       - JWT_SECRET=${JWT_SECRET}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
     volumes:
       - diabetes_data:/app/data
     restart: unless-stopped

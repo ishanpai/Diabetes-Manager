@@ -48,11 +48,19 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma files
+# Copy Prisma files and regenerate client for the correct target
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# Fix ownership of Prisma files before regenerating
+RUN chown -R nextjs:nodejs /app/prisma /app/node_modules/.prisma /app/node_modules/@prisma
+
+# Switch to nextjs user before regenerating Prisma client
 USER nextjs
+
+# Regenerate Prisma client for the correct binary target
+RUN npx prisma generate
 
 EXPOSE 3000
 
