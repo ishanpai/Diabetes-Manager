@@ -23,7 +23,7 @@ This application streamlines diabetes management by:
 ## 🛠️ Tech Stack
 
 - **Frontend**: Next.js (pages router), Material UI, React Hook Form, Zustand
-- **Backend**: Next.js API routes, Prisma ORM with SQLite
+- **Backend**: Next.js API routes, with SQLite
 - **Charts**: Recharts
 - **AI Integration**: OpenAI 4o-mini or Anthropic Haiku
 - **Containerization**: Docker with named volumes
@@ -63,18 +63,12 @@ This application streamlines diabetes management by:
    MODEL_NAME="openai-4o-mini"
    ```
 
-4. **Set up the database**
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
-
-5. **Run the development server**
+4. **Run the development server**
    ```bash
    npm run dev
    ```
 
-6. **Open your browser**
+5. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 ### Production Deployment
@@ -132,7 +126,6 @@ diabetes-manager/
 │   ├── database.js      # Database configuration
 │   ├── ai.js            # AI model integration
 │   └── validation.js    # Data validation schemas
-├── prisma/              # Database schema and migrations
 ├── public/              # Static assets
 ├── styles/              # Global styles and themes
 ├── store/               # Zustand state management

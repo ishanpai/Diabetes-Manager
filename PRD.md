@@ -78,7 +78,7 @@ Deliver a web application that lets a caregiver record meals, blood sugar readin
 | Layer | Choice |
 |-------|--------|
 | Front end | **Next.js** (pages router), Material UI for components, React Hook Form for inputs, Zustand for state |
-| Back end | Next.js API routes, Express style handlers, Prisma ORM with SQLite |
+| Back end | Next.js API routes, Express style handlers, with SQLite |
 | Charts | Recharts |
 | Model adapter | Node service with exponential back-off and cost logging |
 | Container | Single Dockerfile exposing port 3000, named volume for SQLite |

@@ -26,7 +26,6 @@ diabetes-manager/
 ├── 📁 lib/                         # Utility functions and configurations
 ├── 📁 store/                       # Zustand state management
 ├── 📁 types/                       # TypeScript type definitions
-├── 📁 prisma/                      # Database schema and migrations
 ├── 📁 public/                      # Static assets
 └── 📁 styles/                      # Global styles and themes
 ```
@@ -102,7 +101,7 @@ pages/
 
 ```
 lib/
-├── 📄 database.ts                  # Prisma database client
+├── 📄 database.ts                  # SQLite database client
 ├── 📄 auth.ts                      # Authentication utilities
 ├── 📄 ai.ts                        # AI model integration
 ├── 📄 validation.ts                # Form validation schemas
@@ -131,15 +130,6 @@ types/
 ├── 📄 forms.ts                     # Form-related types
 ├── 📄 charts.ts                    # Chart-related types
 └── 📄 store.ts                     # Store-related types
-```
-
-## 🗄️ Prisma Directory (`/prisma`)
-
-```
-prisma/
-├── 📄 schema.prisma                # Database schema definition
-├── 📄 seed.ts                      # Database seeding script
-└── 📁 migrations/                  # Database migrations (auto-generated)
 ```
 
 ## 🎨 Styles Directory (`/styles`)

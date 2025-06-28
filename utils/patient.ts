@@ -9,7 +9,7 @@ export interface PatientWithParsedMedications extends Omit<Patient, 'usualMedica
 
 /**
  * Parses the usualMedications JSON string from the database into an array
- * This function handles the conversion from Prisma's string storage to the frontend array format
+ * This function handles the conversion from SQLite's string storage to the frontend array format
  */
 export function parsePatientMedications(patient: any): PatientWithParsedMedications {
   return {
