@@ -237,6 +237,36 @@ export async function findEntriesByPatientId(patientId: string, limit?: number, 
   }
 }
 
+export async function findEntriesByPatientIdAndType(patientId: string, entryType: 'glucose' | 'meal' | 'insulin', limit?: number, offset?: number): Promise<Entry[]> {
+  try {
+    const result = await db.select()
+      .from(entries)
+      .where(
+        and(
+          eq(entries.patientId, patientId),
+          eq(entries.entryType, entryType)
+        )
+      )
+      .orderBy(desc(entries.occurredAt))
+      .limit(limit || 1000)
+      .offset(offset || 0);
+    
+    return result.map(entry => ({
+      id: entry.id,
+      patientId: entry.patientId,
+      entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
+      value: entry.value,
+      units: entry.units || undefined,
+      medicationBrand: entry.medicationBrand || undefined,
+      occurredAt: entry.occurredAt,
+      createdAt: entry.createdAt || new Date(),
+    }));
+  } catch (error) {
+    console.error('Error finding entries by patient ID and type:', error);
+    return [];
+  }
+}
+
 export async function countEntriesByPatientId(patientId: string): Promise<number> {
   try {
     const result = await db.select({ count: sql`count(*)` })

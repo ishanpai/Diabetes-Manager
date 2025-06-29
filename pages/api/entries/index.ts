@@ -9,6 +9,7 @@ import {
   countEntriesByPatientId,
   createEntry,
   findEntriesByPatientId,
+  findEntriesByPatientIdAndType,
   findUserByEmail,
 } from '@/lib/database';
 
@@ -40,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
-    const { patientId, limit, offset } = req.query;
+    const { patientId, limit, offset, entryType, startDate, endDate } = req.query;
 
     if (!patientId || typeof patientId !== 'string') {
       return res.status(400).json({ success: false, error: 'Patient ID is required' });
@@ -49,11 +50,38 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
     const parsedLimit = limit ? parseInt(limit as string, 10) : 25;
     const parsedOffset = offset ? parseInt(offset as string, 10) : 0;
 
-    // Get total count and entries in parallel
-    const [totalCount, entries] = await Promise.all([
-      countEntriesByPatientId(patientId),
-      findEntriesByPatientId(patientId, parsedLimit, parsedOffset)
-    ]);
+    let entries;
+    let totalCount;
+
+    // If filtering by entry type, use the filtered function
+    if (entryType && typeof entryType === 'string' && ['glucose', 'meal', 'insulin'].includes(entryType)) {
+      entries = await findEntriesByPatientIdAndType(patientId, entryType as 'glucose' | 'meal' | 'insulin', parsedLimit, parsedOffset);
+      
+      // For now, we'll get all entries of this type and count them
+      // In a production app, you'd want a separate count function for filtered results
+      const allEntriesOfType = await findEntriesByPatientIdAndType(patientId, entryType as 'glucose' | 'meal' | 'insulin', 10000, 0);
+      totalCount = allEntriesOfType.length;
+    } else {
+      // Get total count and entries in parallel for unfiltered results
+      [totalCount, entries] = await Promise.all([
+        countEntriesByPatientId(patientId),
+        findEntriesByPatientId(patientId, parsedLimit, parsedOffset)
+      ]);
+    }
+
+    // Apply date filtering if provided
+    if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      entries = entries.filter(entry => {
+        const entryDate = new Date(entry.occurredAt);
+        return entryDate >= start && entryDate <= end;
+      });
+      
+      // Recalculate total count for filtered results
+      totalCount = entries.length;
+    }
 
     const hasMore = parsedOffset + parsedLimit < totalCount;
 
