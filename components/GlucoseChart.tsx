@@ -35,6 +35,7 @@ interface GlucoseChartProps {
 
 interface ChartDataPoint {
   timestamp: string;
+  timestampMs: number;
   glucose: number;
   date: string;
   time: string;
@@ -63,6 +64,7 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
         
         return {
           timestamp: new Date(entry.occurredAt).toISOString(),
+          timestampMs: new Date(entry.occurredAt).getTime(),
           glucose: glucoseValue,
           date: date.toLocaleDateString(),
           time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -97,7 +99,8 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
       const displayValue = settings?.glucoseUnits === 'mmol/L' 
         ? (originalValue / 18).toFixed(1) 
         : Math.round(originalValue);
-      
+      const d = new Date(data.timestampMs);
+      const dateLabel = `${formatDate(d)} at ${formatTime(d)}`;
       return (
         <Box
           sx={{
@@ -109,7 +112,7 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
           }}
         >
           <Typography variant="body2" fontWeight={600}>
-            {data.date} at {data.time}
+            {dateLabel}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Glucose: {displayValue} {settings?.glucoseUnits || 'mg/dL'}
@@ -119,6 +122,20 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
     }
     return null;
   };
+
+  // Determine if readings span multiple days and how many
+  const uniqueDates = Array.from(new Set(chartData.map(d => d.date)));
+  let xAxisMode: 'time' | 'datetime' | 'date' = 'time';
+  if (uniqueDates.length > 5) xAxisMode = 'date';
+  else if (uniqueDates.length > 1) xAxisMode = 'datetime';
+
+  // Helper for formatting
+  function formatDate(d: Date) {
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function formatTime(d: Date) {
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
 
   if (loading) {
     return (
@@ -212,10 +229,18 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
               />
               
               <XAxis 
-                dataKey="time" 
+                type="number"
+                dataKey="timestampMs" 
+                domain={['auto', 'auto']}
                 tick={{ fontSize: 12 }}
                 interval="preserveStartEnd"
                 minTickGap={30}
+                tickFormatter={(value: number) => {
+                  const d = new Date(value);
+                  if (xAxisMode === 'date') return formatDate(d);
+                  if (xAxisMode === 'datetime') return `${formatDate(d)} ${formatTime(d)}`;
+                  return formatTime(d);
+                }}
               />
               <YAxis 
                 domain={[40, 400]}
