@@ -137,6 +137,19 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
     return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
 
+  // Calculate Y-axis range based on data
+  const glucoseValues = chartData.map(d => d.glucose);
+  let yMin = Math.min(...glucoseValues, 70);
+  let yMax = Math.max(...glucoseValues, 180);
+  if (glucoseValues.length > 0) {
+    const range = yMax - yMin;
+    const pad = Math.max(10, Math.round(range * 0.1));
+    yMin = Math.floor((yMin - pad) / 10) * 10;
+    yMax = Math.ceil((yMax + pad) / 10) * 10;
+  }
+  yMin = Math.max(40, yMin);
+  yMax = Math.min(400, yMax);
+
   if (loading) {
     return (
       <Card>
@@ -243,7 +256,7 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
                 }}
               />
               <YAxis 
-                domain={[40, 400]}
+                domain={[yMin, yMax]}
                 tick={{ fontSize: 12 }}
                 label={{ 
                   value: `Glucose (${settings?.glucoseUnits || 'mg/dL'})`, 
