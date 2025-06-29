@@ -232,7 +232,7 @@ function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Dat
 
   // Analyze medication timing patterns from recent history
   const insulinEntries = entries.filter(entry => entry.entryType === 'insulin');
-  const medicationPatterns = analyzeMedicationPatterns(insulinEntries, targetTime);
+  const medicationPatterns = analyzeMedicationPatterns(insulinEntries, targetTime, timeZone);
 
   const patientInfo = `
 <PATIENT_INFO>
@@ -355,24 +355,24 @@ Remember: This is a medical recommendation that should be reviewed by healthcare
 `;
 }
 
-function analyzeMedicationPatterns(insulinEntries: any[], targetTime: Date): string {
+function analyzeMedicationPatterns(insulinEntries: any[], targetTime: Date, timeZone: string) {
   if (insulinEntries.length === 0) {
     return "No recent insulin administration patterns available.";
   }
 
-  // Group entries by time of day
+  // Group entries by time of day using the user's timezone
   const morningEntries = insulinEntries.filter(entry => {
-    const hour = new Date(entry.occurredAt).getHours();
+    const hour = Number(new Date(entry.occurredAt).toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone }));
     return hour >= 6 && hour < 12;
   });
   
   const afternoonEntries = insulinEntries.filter(entry => {
-    const hour = new Date(entry.occurredAt).getHours();
+    const hour = Number(new Date(entry.occurredAt).toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone }));
     return hour >= 12 && hour < 18;
   });
   
   const eveningEntries = insulinEntries.filter(entry => {
-    const hour = new Date(entry.occurredAt).getHours();
+    const hour = Number(new Date(entry.occurredAt).toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone }));
     return hour >= 18 || hour < 6;
   });
 
