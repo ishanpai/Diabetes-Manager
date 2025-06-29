@@ -1,4 +1,7 @@
-import { ReactNode } from 'react';
+import {
+  ReactNode,
+  useState,
+} from 'react';
 
 import {
   signOut,
@@ -6,21 +9,35 @@ import {
 } from 'next-auth/react';
 import Link from 'next/link';
 
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
+import SettingsIcon from '@mui/icons-material/Settings';
 import {
   AppBar,
+  Avatar,
   Box,
-  Button,
   Container,
+  IconButton,
+  Menu,
+  MenuItem,
   Toolbar,
   Typography,
 } from '@mui/material';
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const handleLogout = () => {
     signOut({ callbackUrl: '/' });
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
   };
 
   const getWelcomeMessage = () => {
@@ -54,23 +71,83 @@ export default function Layout({ children }: { children: ReactNode }) {
               {getWelcomeMessage()}
             </Typography>
             {session?.user && (
-              <Button
-                variant="outlined"
-                color="inherit"
-                startIcon={<LogoutIcon />}
-                onClick={handleLogout}
-                size="small"
-                sx={{ 
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  color: 'inherit',
-                  '&:hover': {
-                    borderColor: 'rgba(255, 255, 255, 0.5)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  }
-                }}
-              >
-                Logout
-              </Button>
+              <>
+                <IconButton
+                  onClick={handleMenuOpen}
+                  sx={{ 
+                    color: 'inherit',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    }
+                  }}
+                >
+                  <Avatar 
+                    sx={{ 
+                      width: 32, 
+                      height: 32,
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'inherit',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    {session.user.name ? session.user.name.charAt(0).toUpperCase() : 
+                     session.user.email ? session.user.email.charAt(0).toUpperCase() : 
+                     <AccountCircleIcon />}
+                  </Avatar>
+                </IconButton>
+                <Menu
+                  anchorEl={anchorEl}
+                  open={Boolean(anchorEl)}
+                  onClose={handleMenuClose}
+                  anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                  }}
+                  transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                  }}
+                  PaperProps={{
+                    sx: {
+                      mt: 1,
+                      minWidth: 150,
+                    }
+                  }}
+                >
+                  <Link href="/settings" passHref legacyBehavior>
+                    <MenuItem 
+                      component="a"
+                      onClick={handleMenuClose}
+                      sx={{ 
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        '&:hover': {
+                          backgroundColor: 'primary.light',
+                          color: 'primary.contrastText',
+                        }
+                      }}
+                    >
+                      <SettingsIcon sx={{ mr: 1, fontSize: 20 }} />
+                      Settings
+                    </MenuItem>
+                  </Link>
+                  <MenuItem 
+                    onClick={() => {
+                      handleMenuClose();
+                      handleLogout();
+                    }}
+                    sx={{ 
+                      '&:hover': {
+                        backgroundColor: 'error.light',
+                        color: 'error.contrastText',
+                      }
+                    }}
+                  >
+                    <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
+                    Logout
+                  </MenuItem>
+                </Menu>
+              </>
             )}
           </Box>
         </Toolbar>

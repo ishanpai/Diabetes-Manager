@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
 
-import { signIn } from 'next-auth/react';
+import {
+  signIn,
+  useSession,
+} from 'next-auth/react';
 import { useRouter } from 'next/router';
 import {
   Controller,
@@ -52,11 +58,21 @@ type SignUpForm = z.infer<typeof signUpSchema>;
 
 export default function SignIn() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    if (status === 'loading') return; // Still loading
+    
+    if (session) {
+      router.push('/dashboard');
+    }
+  }, [session, status, router]);
 
   const {
     control,

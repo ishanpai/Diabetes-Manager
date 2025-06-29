@@ -140,6 +140,7 @@ export function EditEntryDialog({
       <DialogContent>
         <EntryForm
           entryType={entry.entryType}
+          patientId={entry.patientId}
           patientMedications={patientMedications}
           defaultValues={defaultValues}
           onSubmit={handleSubmit}

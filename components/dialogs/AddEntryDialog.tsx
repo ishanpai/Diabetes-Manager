@@ -97,6 +97,7 @@ export function AddEntryDialog({
       <DialogContent>
         <EntryForm
           entryType={entryType}
+          patientId={patientId}
           patientMedications={patientMedications}
           onSubmit={handleSubmit}
           onCancel={onClose}

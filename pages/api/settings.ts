@@ -1,0 +1,83 @@
+import {
+  NextApiRequest,
+  NextApiResponse,
+} from 'next';
+import { getServerSession } from 'next-auth';
+import { z } from 'zod';
+
+import {
+  findUserSettingsByUserId,
+  upsertUserSettings,
+} from '@/lib/database';
+
+import { authOptions } from './auth/[...nextauth]';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const session = await getServerSession(req, res, authOptions);
+
+  const userId = (session as any).user?.id || (session as any).user?.email;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  switch (req.method) {
+    case 'GET':
+      return getSettings(req, res, userId);
+    case 'PUT':
+      return updateSettings(req, res, userId);
+    default:
+      return res.status(405).json({ error: 'Method not allowed' });
+  }
+}
+
+async function getSettings(req: NextApiRequest, res: NextApiResponse, userId: string) {
+  try {
+    const settings = findUserSettingsByUserId(userId);
+    
+    // Return default settings if none exist
+    const defaultSettings = {
+      glucoseUnits: 'mg/dL' as const,
+    };
+
+    res.status(200).json({
+      success: true,
+      data: settings ? {
+        glucoseUnits: settings.glucoseUnits,
+      } : defaultSettings,
+    });
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+}
+
+async function updateSettings(req: NextApiRequest, res: NextApiResponse, userId: string) {
+  try {
+    // Create a validation schema
+    const updateSettingsSchema = z.object({
+      glucoseUnits: z.enum(['mg/dL', 'mmol/L']).optional(),
+    });
+
+    const validatedData = updateSettingsSchema.parse(req.body);
+
+    // Update settings in database
+    const updatedSettings = upsertUserSettings(userId, validatedData);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        glucoseUnits: updatedSettings.glucoseUnits,
+      },
+      message: 'Settings updated successfully',
+    });
+  } catch (error) {
+    console.error('Error updating settings:', error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid settings data' });
+    }
+
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+} 

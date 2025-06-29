@@ -40,12 +40,6 @@ interface EntriesTableProps {
   onEntryUpdate: () => void;
 }
 
-interface EntriesResponse {
-  entries: Entry[];
-  totalEntries: number;
-  hasMore: boolean;
-}
-
 export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: EntriesTableProps) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,9 +67,9 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
       }
 
       if (result.success) {
-        setEntries(result.data.entries);
-        setTotalEntries(result.data.totalEntries);
-        setHasMore(result.data.hasMore);
+        setEntries(result.data || []);
+        setTotalEntries((page + 1) * entriesPerPage + (result.data?.length || 0));
+        setHasMore((result.data?.length || 0) === entriesPerPage);
       } else {
         throw new Error(result.error || 'Failed to fetch entries');
       }

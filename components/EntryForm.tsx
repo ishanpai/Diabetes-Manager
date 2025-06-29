@@ -1,4 +1,7 @@
-import React from 'react';
+import React, {
+  useEffect,
+  useState,
+} from 'react';
 
 import {
   Controller,
@@ -6,9 +9,11 @@ import {
 } from 'react-hook-form';
 import { z } from 'zod';
 
+import { useSettings } from '@/hooks/useSettings';
 import { Medication } from '@/types';
 import { formatDateTimeForInput } from '@/utils/uiUtils';
 import { zodResolver } from '@hookform/resolvers/zod';
+import HistoryIcon from '@mui/icons-material/History';
 import {
   Alert,
   Box,
@@ -32,6 +37,7 @@ export interface EntryFormValues {
 
 interface EntryFormProps {
   entryType: 'glucose' | 'meal' | 'insulin';
+  patientId?: string;
   patientMedications?: Medication[];
   defaultValues?: Partial<EntryFormValues>;
   onSubmit: (data: EntryFormValues) => Promise<void>;
@@ -45,8 +51,18 @@ interface EntryFormProps {
   deleteButtonText?: string;
 }
 
+interface PastMeal {
+  id: string;
+  value: string;
+  occurredAt: string;
+  date: string;
+  time: string;
+  timeDiff: number; // minutes difference from entered time
+}
+
 export function EntryForm({
   entryType,
+  patientId,
   patientMedications = [],
   defaultValues,
   onSubmit,
@@ -59,6 +75,11 @@ export function EntryForm({
   onDelete,
   deleteButtonText = 'Delete',
 }: EntryFormProps) {
+  const { settings, loading: settingsLoading } = useSettings();
+  const [fetchingPreviousMeals, setFetchingPreviousMeals] = useState(false);
+  const [pastMeals, setPastMeals] = useState<PastMeal[]>([]);
+  const [selectedPastMeal, setSelectedPastMeal] = useState<string>('');
+  
   // Create validation schema based on entry type
   const getValidationSchema = () => {
     const baseSchema = z.object({
@@ -90,40 +111,113 @@ export function EntryForm({
     }
   };
 
-  // Create a key based on defaultValues to force re-render when they change
-  const formKey = JSON.stringify(defaultValues || {});
+  // Create a key based on defaultValues and settings to force re-render when they change
+  const formKey = JSON.stringify({ defaultValues, settings });
 
   const {
     control,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<EntryFormValues>({
     resolver: zodResolver(getValidationSchema()),
     defaultValues: {
       value: '',
-      units: entryType === 'glucose' ? 'mg/dL' : entryType === 'insulin' ? 'IU' : undefined,
+      units: entryType === 'glucose' ? (settings?.glucoseUnits || 'mg/dL') : entryType === 'insulin' ? 'IU' : undefined,
       medicationBrand: '',
       occurredAt: new Date(),
       ...defaultValues,
     },
   });
 
-  // Reset form when defaultValues change
+  // Watch the occurredAt field to refetch meals when time changes
+  const watchedOccurredAt = watch('occurredAt');
+
+  // Reset form when defaultValues or settings change
   React.useEffect(() => {
-    if (defaultValues) {
       reset({
-        value: '',
-        units: entryType === 'glucose' ? 'mg/dL' : entryType === 'insulin' ? 'IU' : undefined,
-        medicationBrand: '',
-        occurredAt: new Date(),
-        ...defaultValues,
+      value: defaultValues?.value || '',
+      units: entryType === 'glucose' ? (settings?.glucoseUnits || 'mg/dL') : entryType === 'insulin' ? 'IU' : defaultValues?.units,
+      medicationBrand: defaultValues?.medicationBrand || '',
+      occurredAt: defaultValues?.occurredAt || new Date(),
       });
+  }, [defaultValues, entryType, reset, settings?.glucoseUnits]);
+
+  // Fetch past meals when the time changes
+  useEffect(() => {
+    if (entryType === 'meal' && patientId && watchedOccurredAt) {
+      fetchPastMeals();
     }
-  }, [defaultValues, entryType, reset]);
+  }, [entryType, patientId, watchedOccurredAt]);
 
   const handleFormSubmit = async (data: EntryFormValues) => {
     await onSubmit(data);
+  };
+
+  const fetchPastMeals = async () => {
+    if (!patientId || !watchedOccurredAt) return;
+    
+    setFetchingPreviousMeals(true);
+    try {
+      // Get the time from the form
+      const enteredTime = new Date(watchedOccurredAt);
+      const enteredTimeMinutes = enteredTime.getHours() * 60 + enteredTime.getMinutes();
+      
+      // Fetch meals from the last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const response = await fetch(`/api/entries?patientId=${patientId}&entryType=meal&startDate=${thirtyDaysAgo.toISOString().split('T')[0]}&endDate=${new Date().toISOString().split('T')[0]}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data.length > 0) {
+          // Process and sort meals by relevance to entered time
+          const processedMeals: PastMeal[] = result.data.map((meal: any) => {
+            const mealDate = new Date(meal.occurredAt);
+            const mealTimeMinutes = mealDate.getHours() * 60 + mealDate.getMinutes();
+            const timeDiff = Math.abs(mealTimeMinutes - enteredTimeMinutes);
+            
+            return {
+              id: meal.id,
+              value: meal.value,
+              occurredAt: meal.occurredAt,
+              date: mealDate.toLocaleDateString(),
+              time: mealDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              timeDiff,
+            };
+          });
+          
+          // Sort by time difference (closest first), then by date (most recent first)
+          processedMeals.sort((a, b) => {
+            if (a.timeDiff !== b.timeDiff) {
+              return a.timeDiff - b.timeDiff;
+            }
+            return new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime();
+          });
+          
+          // Limit to top 10 most relevant meals
+          setPastMeals(processedMeals.slice(0, 10));
+        } else {
+          setPastMeals([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching past meals:', error);
+      setPastMeals([]);
+    } finally {
+      setFetchingPreviousMeals(false);
+    }
+  };
+
+  const handlePastMealSelect = (mealId: string) => {
+    setSelectedPastMeal(mealId);
+    const selectedMeal = pastMeals.find(meal => meal.id === mealId);
+    if (selectedMeal) {
+      setValue('value', selectedMeal.value);
+    }
   };
 
   const getValueLabel = () => {
@@ -160,8 +254,17 @@ export function EntryForm({
         </Alert>
       )}
 
+      {/* Show loading spinner while settings are loading */}
+      {settingsLoading && (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* Only show form when settings are loaded */}
+      {!settingsLoading && (
       <Box display="flex" flexDirection="column" gap={3} sx={{ mt: 1 }}>
-        {/* Glucose Units */}
+          {/* Glucose Units - Dropdown with options */}
         {entryType === 'glucose' && (
           <Controller
             name="units"
@@ -199,6 +302,7 @@ export function EntryForm({
           name="value"
           control={control}
           render={({ field }) => (
+              <Box>
             <TextField
               {...field}
               label={getValueLabel()}
@@ -215,6 +319,44 @@ export function EntryForm({
                   : {}
               }
             />
+                {/* Past Meals Dropdown - Only for meal entries */}
+                {entryType === 'meal' && patientId && (
+                  <Box mt={1}>
+                    <FormControl fullWidth>
+                      <InputLabel>
+                        {fetchingPreviousMeals ? 'Loading past meals...' : 'Choose from past meals'}
+                      </InputLabel>
+                      <Select
+                        value={selectedPastMeal}
+                        onChange={(e) => handlePastMealSelect(e.target.value)}
+                        label={fetchingPreviousMeals ? 'Loading past meals...' : 'Choose from past meals'}
+                        disabled={fetchingPreviousMeals || pastMeals.length === 0}
+                        startAdornment={fetchingPreviousMeals ? <CircularProgress size={16} /> : <HistoryIcon />}
+                      >
+                        {pastMeals.length === 0 && !fetchingPreviousMeals && (
+                          <MenuItem disabled>No past meals found</MenuItem>
+                        )}
+                        {pastMeals.map((meal) => (
+                          <MenuItem key={meal.id} value={meal.id}>
+                            <Box>
+                              <Typography variant="body2">{meal.value}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {meal.date} at {meal.time} 
+                                {meal.timeDiff > 0 && ` (${meal.timeDiff} min ${meal.timeDiff === 1 ? 'difference' : 'difference'})`}
+                              </Typography>
+                            </Box>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      {pastMeals.length > 0 && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                          Showing meals closest to the time you entered
+                        </Typography>
+                      )}
+                    </FormControl>
+                  </Box>
+                )}
+              </Box>
           )}
         />
 
@@ -223,11 +365,21 @@ export function EntryForm({
           <Controller
             name="medicationBrand"
             control={control}
-            render={({ field }) => (
+              render={({ field }) => {
+                // Deduplicate medications by trimming whitespace and removing duplicates
+                const uniqueMedications = Array.from(
+                  new Set(
+                    patientMedications
+                      .map(med => med.brand.trim())
+                      .filter(brand => brand.length > 0)
+                  )
+                ).sort();
+
+                return (
               <FormControl fullWidth>
                 <InputLabel>Medication</InputLabel>
                 <Select {...field} label="Medication" error={!!errors.medicationBrand}>
-                  {Array.from(new Set(patientMedications.map(med => med.brand))).map((brand) => (
+                      {uniqueMedications.map((brand) => (
                     <MenuItem key={brand} value={brand}>
                       {brand}
                     </MenuItem>
@@ -239,7 +391,8 @@ export function EntryForm({
                   </Typography>
                 )}
               </FormControl>
-            )}
+                );
+              }}
           />
         )}
 
@@ -268,6 +421,7 @@ export function EntryForm({
           )}
         />
       </Box>
+      )}
 
       {/* Action Buttons */}
       <Box display="flex" justifyContent="space-between" mt={4}>
@@ -276,20 +430,20 @@ export function EntryForm({
             onClick={onDelete} 
             color="error" 
             variant="outlined"
-            disabled={loading}
+            disabled={loading || settingsLoading}
           >
             {deleteButtonText}
           </Button>
         )}
         
         <Box display="flex" gap={2} ml="auto">
-          <Button onClick={onCancel} disabled={loading}>
+          <Button onClick={onCancel} disabled={loading || settingsLoading}>
             {cancelButtonText}
           </Button>
           <Button
             type="submit"
             variant="contained"
-            disabled={loading}
+            disabled={loading || settingsLoading}
             startIcon={loading ? <CircularProgress size={16} /> : null}
           >
             {loading ? 'Saving...' : submitButtonText}

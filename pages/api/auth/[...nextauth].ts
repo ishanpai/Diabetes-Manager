@@ -1,4 +1,4 @@
-import NextAuth from 'next-auth';
+import NextAuth, { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 
@@ -9,7 +9,7 @@ import {
 } from '@/lib/database';
 import { CustomAdapter } from '@/lib/nextauth-adapter';
 
-export default NextAuth({
+export const authOptions: NextAuthOptions = {
   adapter: CustomAdapter(),
   providers: [
     GoogleProvider({
@@ -57,19 +57,19 @@ export default NextAuth({
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account }: any) {
       if (user) {
         token.id = user.id;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (token) {
         session.user.id = token.id as string;
       }
       return session;
     },
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account, profile }: any) {
       if (account?.provider === 'google') {
         // Ensure user has required fields
         if (!user.email) {
@@ -97,4 +97,6 @@ export default NextAuth({
     error: '/auth/signin',
   },
   secret: process.env.NEXTAUTH_SECRET,
-}); 
+};
+
+export default NextAuth(authOptions); 

@@ -51,7 +51,7 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
     }
 
     // Get query parameters
-    const { patientId, limit = 10, offset = 0 } = req.query;
+    const { patientId, limit = 10, offset = 0, entryType, date, startDate, endDate } = req.query;
     const limitNum = parseInt(limit as string, 10);
     const offsetNum = parseInt(offset as string, 10);
 
@@ -69,6 +69,33 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
 
       // Get entries for this specific patient
       entries = findEntriesByPatientId(patientId, limitNum, offsetNum);
+      
+      // Filter by entry type if specified
+      if (entryType && typeof entryType === 'string') {
+        entries = entries.filter(entry => entry.entryType === entryType);
+      }
+      
+      // Filter by date range if specified
+      if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        entries = entries.filter(entry => {
+          const entryDate = new Date(entry.occurredAt);
+          return entryDate >= start && entryDate <= end;
+        });
+      }
+      // Filter by single date if specified (for backward compatibility)
+      else if (date && typeof date === 'string') {
+        const targetDate = new Date(date);
+        const targetDateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        
+        entries = entries.filter(entry => {
+          const entryDate = new Date(entry.occurredAt);
+          const entryDateStr = entryDate.toISOString().split('T')[0];
+          return entryDateStr === targetDateStr;
+        });
+      }
     } else {
       // Get all entries for all patients of the user
       const patients = findPatientsByUserId(actualUserId);
@@ -76,6 +103,33 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
       for (const patient of patients) {
         const patientEntries = findEntriesByPatientId(patient.id, limitNum, offsetNum);
         entries.push(...patientEntries);
+      }
+      
+      // Apply filters to all entries
+      if (entryType && typeof entryType === 'string') {
+        entries = entries.filter(entry => entry.entryType === entryType);
+      }
+      
+      // Filter by date range if specified
+      if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        entries = entries.filter(entry => {
+          const entryDate = new Date(entry.occurredAt);
+          return entryDate >= start && entryDate <= end;
+        });
+      }
+      // Filter by single date if specified (for backward compatibility)
+      else if (date && typeof date === 'string') {
+        const targetDate = new Date(date);
+        const targetDateStr = targetDate.toISOString().split('T')[0];
+        
+        entries = entries.filter(entry => {
+          const entryDate = new Date(entry.occurredAt);
+          const entryDateStr = entryDate.toISOString().split('T')[0];
+          return entryDateStr === targetDateStr;
+        });
       }
     }
 
@@ -93,11 +147,7 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
 
     res.status(200).json({
       success: true,
-      data: {
-        entries: Array.isArray(transformedEntries) ? transformedEntries : [],
-        totalEntries: transformedEntries.length,
-        hasMore: false, // You can implement pagination logic if needed
-      },
+      data: transformedEntries,
     });
   } catch (error) {
     console.error('Error fetching entries:', error);

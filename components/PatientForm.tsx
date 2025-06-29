@@ -12,6 +12,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 // MUI imports
 import {
   Alert,
@@ -27,6 +28,7 @@ import {
   Paper,
   Select,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 
@@ -223,12 +225,42 @@ export function PatientForm({
                     onChange={(e) => handleInputChange('diabetesType', e.target.value)}
                   >
                     <MenuItem value="">Select diabetes type</MenuItem>
-                    <MenuItem value="type1">Type 1</MenuItem>
-                    <MenuItem value="type2">Type 2</MenuItem>
-                    <MenuItem value="gestational">Gestational</MenuItem>
-                    <MenuItem value="other">Other</MenuItem>
+                    <MenuItem value="type1">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        Type 1
+                        <Tooltip title="The body doesn't produce insulin. Also known as insulin-dependent diabetes, it usually develops in children/young adults. Requires insulin injections." placement="right">
+                          <HelpOutlineIcon fontSize="small" color="action" />
+                        </Tooltip>
+                      </Box>
+                    </MenuItem>
+                    <MenuItem value="type2">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        Type 2
+                        <Tooltip title="The body doesn't use insulin properly. Usually develops in adults. Can be managed with diet, exercise, and medication." placement="right">
+                          <HelpOutlineIcon fontSize="small" color="action" />
+                        </Tooltip>
+                      </Box>
+                    </MenuItem>
+                    <MenuItem value="gestational">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        Gestational
+                        <Tooltip title="Develops during pregnancy. Usually goes away after childbirth but increases risk of Type 2 later." placement="right">
+                          <HelpOutlineIcon fontSize="small" color="action" />
+                        </Tooltip>
+                      </Box>
+                    </MenuItem>
+                    <MenuItem value="other">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        Other
+                        <Tooltip title="Includes rare forms like MODY, LADA, or other specific types." placement="right">
+                          <HelpOutlineIcon fontSize="small" color="action" />
+                        </Tooltip>
+                      </Box>
+                    </MenuItem>
                   </Select>
-                  <FormHelperText>{errors.diabetesType}</FormHelperText>
+                  <FormHelperText>
+                    {errors.diabetesType || "Click the help icons (?) for more information about each type"}
+                  </FormHelperText>
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={6}>

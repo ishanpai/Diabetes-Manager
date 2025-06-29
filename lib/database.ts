@@ -14,6 +14,14 @@ export interface User {
   updatedAt: Date;
 }
 
+export interface UserSettings {
+  id: string;
+  userId: string;
+  glucoseUnits: 'mg/dL' | 'mmol/L';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Account {
   id: string;
   userId: string;
@@ -206,6 +214,19 @@ function initializeTables() {
       targetTime DATETIME,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
+    )
+  `);
+
+  // User settings table
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS user_settings (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      glucoseUnits TEXT NOT NULL DEFAULT 'mg/dL',
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(userId)
     )
   `);
 
@@ -590,4 +611,75 @@ export function deleteRecommendation(id: string): boolean {
   const stmt = database.prepare('DELETE FROM recommendations WHERE id = ?');
   const result = stmt.run(id);
   return result.changes > 0;
+}
+
+// User settings functions
+export function findUserSettingsByUserId(userId: string): UserSettings | undefined {
+  const database = getDatabase();
+  const stmt = database.prepare('SELECT * FROM user_settings WHERE userId = ?');
+  const settings = stmt.get(userId) as UserSettings | undefined;
+  return settings ? { 
+    ...settings, 
+    createdAt: new Date(settings.createdAt), 
+    updatedAt: new Date(settings.updatedAt) 
+  } : undefined;
+}
+
+export function createUserSettings(settingsData: Omit<UserSettings, 'id' | 'createdAt' | 'updatedAt'>): UserSettings {
+  const database = getDatabase();
+  const id = generateId('set_');
+  const now = new Date();
+  
+  const stmt = database.prepare(`
+    INSERT INTO user_settings (id, userId, glucoseUnits, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  
+  stmt.run(id, settingsData.userId, settingsData.glucoseUnits, now.toISOString(), now.toISOString());
+  
+  return {
+    id,
+    ...settingsData,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export function updateUserSettings(userId: string, settingsData: Partial<Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): UserSettings | undefined {
+  const database = getDatabase();
+  const now = new Date();
+  
+  const stmt = database.prepare(`
+    UPDATE user_settings 
+    SET glucoseUnits = COALESCE(?, glucoseUnits), updatedAt = ?
+    WHERE userId = ?
+  `);
+  
+  // Convert undefined values to null for SQLite compatibility
+  const glucoseUnits = settingsData.glucoseUnits ?? null;
+  
+  const result = stmt.run(glucoseUnits, now.toISOString(), userId);
+  
+  if (result.changes > 0) {
+    return findUserSettingsByUserId(userId);
+  }
+  return undefined;
+}
+
+export function upsertUserSettings(userId: string, settingsData: Partial<Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): UserSettings {
+  const existingSettings = findUserSettingsByUserId(userId);
+  
+  if (existingSettings) {
+    const updatedSettings = updateUserSettings(userId, settingsData);
+    if (updatedSettings) {
+      return updatedSettings;
+    }
+    // Fallback to existing settings if update failed
+    return existingSettings;
+  } else {
+    return createUserSettings({
+      userId,
+      glucoseUnits: settingsData.glucoseUnits || 'mg/dL',
+    });
+  }
 }
