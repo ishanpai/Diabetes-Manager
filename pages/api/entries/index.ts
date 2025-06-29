@@ -43,7 +43,7 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -60,7 +60,7 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
     if (patientId && typeof patientId === 'string') {
       // Get entries for a specific patient
       // First verify the patient belongs to the user
-      const patients = findPatientsByUserId(actualUserId);
+      const patients = await findPatientsByUserId(actualUserId);
       const patient = patients.find(p => p.id === patientId);
       
       if (!patient) {
@@ -68,7 +68,7 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
       }
 
       // Get entries for this specific patient
-      entries = findEntriesByPatientId(patientId, limitNum, offsetNum);
+      entries = await findEntriesByPatientId(patientId, limitNum, offsetNum);
       
       // Filter by entry type if specified
       if (entryType && typeof entryType === 'string') {
@@ -98,10 +98,10 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
       }
     } else {
       // Get all entries for all patients of the user
-      const patients = findPatientsByUserId(actualUserId);
+      const patients = await findPatientsByUserId(actualUserId);
       
       for (const patient of patients) {
-        const patientEntries = findEntriesByPatientId(patient.id, limitNum, offsetNum);
+        const patientEntries = await findEntriesByPatientId(patient.id, limitNum, offsetNum);
         entries.push(...patientEntries);
       }
       
@@ -160,7 +160,7 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -218,7 +218,7 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     // Debug: log the entry data before creating
     console.log('Creating entry with data:', JSON.stringify(entryData, null, 2));
 
-    const newEntry = createEntry(entryData);
+    const newEntry = await createEntry(entryData);
 
     if (!newEntry) {
       return res.status(500).json({ error: 'Failed to create entry' });

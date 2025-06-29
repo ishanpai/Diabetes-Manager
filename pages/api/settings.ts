@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 async function getSettings(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
-    const settings = findUserSettingsByUserId(userId);
+    const settings = await findUserSettingsByUserId(userId);
     
     // Return default settings if none exist
     const defaultSettings = {
@@ -62,7 +62,11 @@ async function updateSettings(req: NextApiRequest, res: NextApiResponse, userId:
     const validatedData = updateSettingsSchema.parse(req.body);
 
     // Update settings in database
-    const updatedSettings = upsertUserSettings(userId, validatedData);
+    const updatedSettings = await upsertUserSettings(userId, validatedData.glucoseUnits || 'mg/dL');
+
+    if (!updatedSettings) {
+      return res.status(500).json({ error: 'Failed to update settings' });
+    }
 
     res.status(200).json({
       success: true,

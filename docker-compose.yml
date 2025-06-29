@@ -1,4 +1,23 @@
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: diabetes_manager
+      POSTGRES_USER: diabetes_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-diabetes_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U diabetes_user -d diabetes_manager"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Main Application
   diabetes-companion:
     build:
       context: .
@@ -7,14 +26,17 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/data/diabetes.db
+      - DATABASE_URL=postgresql://diabetes_user:${POSTGRES_PASSWORD:-diabetes_password}@postgres:5432/diabetes_manager
       - MODEL_API_KEY=${MODEL_API_KEY}
       - MODEL_NAME=${MODEL_NAME:-openai-4o-mini}
       - JWT_SECRET=${JWT_SECRET}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL}
-    volumes:
-      - diabetes_data:/app/data
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
@@ -39,5 +61,5 @@ services:
       - production
 
 volumes:
-  diabetes_data:
+  postgres_data:
     driver: local 

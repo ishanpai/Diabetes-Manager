@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -14,16 +17,17 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePatient } from '@/hooks/usePatient';
 import {
   Entry,
-  PatientWithEntries,
   Recommendation,
 } from '@/types';
 import {
   formatPatientAge,
   getDiabetesTypeColor,
+  getHistoryRequirementStatus,
 } from '@/utils/patientUtils';
 import { formatDate } from '@/utils/uiUtils';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import InfoIcon from '@mui/icons-material/Info';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import MedicationIcon from '@mui/icons-material/Medication';
 import MonitorIcon from '@mui/icons-material/Monitor';
@@ -47,6 +51,8 @@ interface PatientDetailProps {
 
 export function PatientDetail({ patientId, showHeader = true, showActions = true }: PatientDetailProps) {
   const { patient, loading, error, refetch } = usePatient(patientId);
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [entriesLoading, setEntriesLoading] = useState(true);
   const router = useRouter();
 
   // Dialog state
@@ -54,6 +60,37 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
   const [entryType, setEntryType] = useState<'glucose' | 'meal' | 'insulin'>('glucose');
   const [entryDefaultValues, setEntryDefaultValues] = useState<any>(undefined);
   const [recommendationDialogOpen, setRecommendationDialogOpen] = useState(false);
+
+  // Fetch entries for the patient
+  const fetchEntries = async () => {
+    setEntriesLoading(true);
+    try {
+      const response = await fetch(`/api/entries?patientId=${patientId}&limit=1000&offset=0`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch entries');
+      }
+
+      if (result.success) {
+        setEntries(result.data || []);
+      } else {
+        throw new Error(result.error || 'Failed to fetch entries');
+      }
+    } catch (err) {
+      console.error('Error fetching entries:', err);
+      setEntries([]);
+    } finally {
+      setEntriesLoading(false);
+    }
+  };
+
+  // Fetch entries when patientId changes
+  useEffect(() => {
+    if (patientId) {
+      fetchEntries();
+    }
+  }, [patientId]);
 
   const handleDeletePatient = async () => {
     if (!confirm('Are you sure you want to delete this patient? This action cannot be undone.')) {
@@ -84,12 +121,17 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
   };
 
   const handleRecommendInsulin = () => {
+    if (!historyRequirementStatus.hasSufficientHistory) {
+      alert(historyRequirementStatus.message);
+      return;
+    }
     setRecommendationDialogOpen(true);
   };
 
   const handleEntrySuccess = (entry: Entry) => {
-    // Refresh patient data to show new entry
+    // Refresh patient data and entries to show new entry
     refetch();
+    fetchEntries();
   };
 
   const handleRecommendationSuccess = (recommendation: Recommendation) => {
@@ -98,23 +140,30 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
   };
 
   const handleAddEntryFromRecommendation = (entryType: 'insulin', defaultValues: any) => {
+
+    if (!patient) {
+      alert("Patient not found");
+      return;
+    }
+
     setEntryType(entryType);
-    
+
     // If no medication brand is provided, use the first available insulin medication
     let finalDefaultValues = { ...defaultValues };
-    if (entryType === 'insulin' && !defaultValues.medicationBrand && patientWithEntries.usualMedications?.length > 0) {
+    if (entryType === 'insulin' && !defaultValues.medicationBrand && patient.usualMedications?.length > 0) {
       // Find the first insulin medication (assuming all medications in the list are insulin)
-      const firstMedication = patientWithEntries.usualMedications[0];
+      const firstMedication = patient.usualMedications[0];
       finalDefaultValues.medicationBrand = firstMedication.brand;
     }
-    
+
     setEntryDefaultValues(finalDefaultValues);
     setEntryDialogOpen(true);
   };
 
   const handleEntryUpdate = () => {
-    // Refresh patient data when entries are updated
+    // Refresh patient data and entries when entries are updated
     refetch();
+    fetchEntries();
   };
 
   if (loading) {
@@ -129,8 +178,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
     return <EmptyState title="Patient not found" description="The patient you're looking for doesn't exist." />;
   }
 
-  // Explicitly type patient as PatientWithEntries to fix TypeScript error
-  const patientWithEntries = patient as PatientWithEntries;
+  const historyRequirementStatus = getHistoryRequirementStatus(entries);
 
   return (
     <Container maxWidth="lg">
@@ -138,16 +186,16 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
         <Box mb={4} display="flex" justifyContent="space-between" alignItems="flex-start">
           <Box>
             <Typography variant="h4" gutterBottom>
-              {patientWithEntries.name}
+              {patient.name}
             </Typography>
             <Box display="flex" alignItems="center" gap={2}>
               <Typography variant="body1" color="text.secondary">
-                {formatPatientAge(patientWithEntries)}
+                {formatPatientAge(patient)}
               </Typography>
-              <Chip 
-                label={patientWithEntries.diabetesType} 
-                color={getDiabetesTypeColor(patientWithEntries.diabetesType)} 
-                size="small" 
+              <Chip
+                label={patient.diabetesType}
+                color={getDiabetesTypeColor(patient.diabetesType)}
+                size="small"
               />
             </Box>
           </Box>
@@ -215,6 +263,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
               fullWidth
               startIcon={<LocalHospitalIcon />}
               onClick={handleRecommendInsulin}
+              disabled={!historyRequirementStatus.hasSufficientHistory || entriesLoading}
               sx={{ py: 3, fontSize: '1.1rem' }}
             >
               Get Insulin Dose Recommendation
@@ -223,12 +272,47 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
         </Grid>
       </Box>
 
+      {/* History Status Card */}
+      {entriesLoading && (
+        <Typography variant="body2" color="text.secondary">
+          Loading patient history...
+        </Typography>
+      )}
+      {!historyRequirementStatus.hasSufficientHistory && (
+        <Card variant="outlined" sx={{ mb: 3 }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" gap={2} mb={1}>
+              <InfoIcon color={historyRequirementStatus.hasSufficientHistory ? "success" : "warning"} />
+              <Typography variant="h6">
+                Not enough history for recommendations
+              </Typography>
+            </Box>
+            <Box mt={2} p={2} bgcolor="grey.50" borderRadius={1}>
+              <Typography variant="body2" fontWeight={600} gutterBottom>
+                To enable insulin recommendations, please add:
+              </Typography>
+              <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                <Typography component="li" variant="body2" color="text.secondary">
+                  At least 3 entries (glucose readings, meals, or insulin doses)
+                </Typography>
+                <Typography component="li" variant="body2" color="text.secondary">
+                  Entries from at least 1 day ago (not just today)
+                </Typography>
+                <Typography component="li" variant="body2" color="text.secondary">
+                  A mix of different entry types for better context
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
       <Grid container spacing={3}>
         {/* Recent Entries - Middle */}
         <Grid item xs={12} md={8}>
           <EntriesTable
             patientId={patientId}
-            patientMedications={patientWithEntries.usualMedications}
+            patientMedications={patient.usualMedications}
             onEntryUpdate={handleEntryUpdate}
           />
         </Grid>
@@ -243,30 +327,30 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
               <Box display="flex" flexDirection="column" gap={2}>
                 <Box>
                   <Typography variant="body2" color="text.secondary">Name</Typography>
-                  <Typography variant="body1">{patientWithEntries.name}</Typography>
+                  <Typography variant="body1">{patient.name}</Typography>
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary">Age</Typography>
-                  <Typography variant="body1">{formatPatientAge(patientWithEntries)}</Typography>
+                  <Typography variant="body1">{formatPatientAge(patient)}</Typography>
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary">Date of Birth</Typography>
-                  <Typography variant="body1">{formatDate(patientWithEntries.dob)}</Typography>
+                  <Typography variant="body1">{formatDate(patient.dob)}</Typography>
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary">Diabetes Type</Typography>
-                  <Chip label={patientWithEntries.diabetesType} color={getDiabetesTypeColor(patientWithEntries.diabetesType)} size="small" />
+                  <Chip label={patient.diabetesType} color={getDiabetesTypeColor(patient.diabetesType)} size="small" />
                 </Box>
-                {patientWithEntries.lifestyle && (
+                {patient.lifestyle && (
                   <Box>
                     <Typography variant="body2" color="text.secondary">Lifestyle</Typography>
-                    <Typography variant="body1">{patientWithEntries.lifestyle}</Typography>
+                    <Typography variant="body1">{patient.lifestyle}</Typography>
                   </Box>
                 )}
-                {patientWithEntries.activityLevel && (
+                {patient.activityLevel && (
                   <Box>
                     <Typography variant="body2" color="text.secondary">Activity Level</Typography>
-                    <Typography variant="body1">{patientWithEntries.activityLevel}</Typography>
+                    <Typography variant="body1">{patient.activityLevel}</Typography>
                   </Box>
                 )}
               </Box>
@@ -279,9 +363,9 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
               <Typography variant="h6" gutterBottom>
                 Usual Medications
               </Typography>
-              {patientWithEntries.usualMedications && patientWithEntries.usualMedications.length > 0 ? (
+              {patient.usualMedications && patient.usualMedications.length > 0 ? (
                 <Box display="flex" flexDirection="column" gap={1}>
-                  {patientWithEntries.usualMedications.map((med, index) => (
+                  {patient.usualMedications.map((med, index) => (
                     <Box key={index} p={2} border={1} borderColor="grey.200" borderRadius={1}>
                       <Typography variant="body1" fontWeight={600}>
                         {med.brand}
@@ -308,7 +392,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
         onClose={() => setEntryDialogOpen(false)}
         entryType={entryType}
         patientId={patientId}
-        patientMedications={patientWithEntries.usualMedications}
+        patientMedications={patient.usualMedications}
         defaultValues={entryDefaultValues}
         onSuccess={handleEntrySuccess}
       />
@@ -317,7 +401,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
         open={recommendationDialogOpen}
         onClose={() => setRecommendationDialogOpen(false)}
         patientId={patientId}
-        patientName={patientWithEntries.name}
+        patientName={patient.name}
         onSuccess={handleRecommendationSuccess}
         onAddEntry={handleAddEntryFromRecommendation}
       />

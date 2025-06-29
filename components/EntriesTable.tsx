@@ -68,7 +68,7 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
 
       if (result.success) {
         setEntries(result.data || []);
-        setTotalEntries((page + 1) * entriesPerPage + (result.data?.length || 0));
+        setTotalEntries(result.data?.length || 0);
         setHasMore((result.data?.length || 0) === entriesPerPage);
       } else {
         throw new Error(result.error || 'Failed to fetch entries');

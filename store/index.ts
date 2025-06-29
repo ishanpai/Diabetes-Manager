@@ -135,6 +135,8 @@ export const usePatientEntries = (patientId?: string) => {
   const entries = useEntries();
   const currentPatient = useCurrentPatient();
   const targetPatientId = patientId || currentPatient?.id;
+
+  console.log("Entries:", entries);
   
   return targetPatientId ? entries.filter(entry => entry.patientId === targetPatientId) : [];
 };

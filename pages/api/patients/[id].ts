@@ -51,45 +51,22 @@ async function getPatient(req: NextApiRequest, res: NextApiResponse, userId: str
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    const patient = findPatientById(patientId);
+    // Fetch patient and await the result
+    const patient = await findPatientById(patientId);
     if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+      return res.status(404).json({ error: 'Patient not found or access denied' });
     }
-
-    // Verify the patient belongs to the user
-    if (patient.userId !== actualUserId) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-
-    // Transform for response
-    let medications = [];
-    try {
-      medications = JSON.parse(patient.usualMedications || '[]');
-    } catch {
-      medications = [];
-    }
-    const transformedPatient = {
-      id: patient.id,
-      name: patient.name,
-      dob: patient.dob,
-      diabetesType: patient.diabetesType,
-      lifestyle: patient.lifestyle,
-      activityLevel: patient.activityLevel,
-      usualMedications: medications,
-      createdAt: patient.createdAt,
-      updatedAt: patient.updatedAt,
-    };
 
     res.status(200).json({
       success: true,
-      data: transformedPatient,
+      data: patient,
     });
   } catch (error) {
     console.error('Error fetching patient:', error);
@@ -102,23 +79,21 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    // Verify the patient belongs to the user
-    const existingPatient = findPatientById(patientId);
-    if (!existingPatient) {
-      return res.status(404).json({ error: 'Patient not found' });
+    // Fetch patient and await the result
+    const patient = await findPatientById(patientId);
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found or access denied' });
     }
-
-    if (existingPatient.userId !== actualUserId) {
-      return res.status(404).json({ error: 'Patient not found' });
+    if ((patient as any).userId !== actualUserId) {
+      return res.status(404).json({ error: 'Patient not found or access denied' });
     }
-
     // Create a validation schema
     const updatePatientSchema = z.object({
       name: z.string().min(1, 'Name is required').optional(),
@@ -160,34 +135,16 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
       updateData.usualMedications = validatedData.usualMedications;
     }
 
-    const updatedPatient = updatePatient(patientId, updateData);
+    const updatedPatient = await updatePatient(patientId, updateData);
 
     if (!updatedPatient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Transform for response
-    let updatedMedications = [];
-    try {
-      updatedMedications = JSON.parse(updatedPatient.usualMedications || '[]');
-    } catch {
-      updatedMedications = [];
-    }
-    const transformedUpdatedPatient = {
-      id: updatedPatient.id,
-      name: updatedPatient.name,
-      dob: updatedPatient.dob,
-      diabetesType: updatedPatient.diabetesType,
-      lifestyle: updatedPatient.lifestyle,
-      activityLevel: updatedPatient.activityLevel,
-      usualMedications: updatedMedications,
-      createdAt: updatedPatient.createdAt,
-      updatedAt: updatedPatient.updatedAt,
-    };
 
     res.status(200).json({
       success: true,
-      data: transformedUpdatedPatient,
+      data: updatedPatient,
       message: 'Patient updated successfully',
     });
   } catch (error) {
@@ -206,21 +163,20 @@ async function deletePatientHandler(req: NextApiRequest, res: NextApiResponse, u
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    // Verify the patient belongs to the user
-    const patient = findPatientById(patientId);
+    // Fetch patient and await the result
+    const patient = await findPatientById(patientId);
     if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+      return res.status(404).json({ error: 'Patient not found or access denied' });
     }
-
-    if (patient.userId !== actualUserId) {
-      return res.status(404).json({ error: 'Patient not found' });
+    if ((patient as any).userId !== actualUserId) {
+      return res.status(404).json({ error: 'Patient not found or access denied' });
     }
 
     const success = deletePatient(patientId);

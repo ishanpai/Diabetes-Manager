@@ -1,5 +1,6 @@
 import { calculateAge } from '@/lib/dateUtils';
 import {
+  Entry,
   Patient,
   PatientWithStats,
 } from '@/types';
@@ -64,4 +65,73 @@ export function formatMedications(patient: Patient | PatientWithStats): string {
   }
   
   return `${patient.usualMedications.length} medications`;
+}
+
+export function hasSufficientHistoryForRecommendations(entries: Entry[]): boolean {
+  if (entries.length === 0) return false;
+  
+  // Check if we have entries from at least 1 day ago
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  
+  // Check if any entry is from at least 1 day ago
+  const hasHistoricalData = entries.some(entry => {
+    const entryDate = new Date(entry.occurredAt);
+    return entryDate < oneDayAgo;
+  });
+  
+  // Also require at least 3 total entries for better context
+  return hasHistoricalData && entries.length >= 3;
+}
+
+export function getHistoryRequirementStatus(entries: Entry[]): {
+  hasSufficientHistory: boolean;
+  message: string;
+  missingDays: number;
+  totalEntries: number;
+} {
+  const totalEntries = entries.length;
+  
+  if (totalEntries === 0) {
+    return {
+      hasSufficientHistory: false,
+      message: "No patient history found. Please add at least 1 day of glucose readings, meals, and insulin doses before getting recommendations.",
+      missingDays: 1,
+      totalEntries: 0
+    };
+  }
+  
+  if (totalEntries < 3) {
+    return {
+      hasSufficientHistory: false,
+      message: `Only ${totalEntries} entries found. Please add at least 3 entries (glucose, meals, insulin) over at least 1 day before getting recommendations.`,
+      missingDays: 1,
+      totalEntries
+    };
+  }
+  
+  // Check if we have entries from at least 1 day ago
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  
+  const hasHistoricalData = entries.some(entry => {
+    const entryDate = new Date(entry.occurredAt);
+    return entryDate < oneDayAgo;
+  });
+  
+  if (!hasHistoricalData) {
+    return {
+      hasSufficientHistory: false,
+      message: "All entries are from today. Please add entries from at least 1 day ago to provide better context for recommendations.",
+      missingDays: 1,
+      totalEntries
+    };
+  }
+  
+  return {
+    hasSufficientHistory: true,
+    message: "Sufficient history available for recommendations.",
+    missingDays: 0,
+    totalEntries
+  };
 } 

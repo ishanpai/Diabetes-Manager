@@ -8,50 +8,45 @@ import {
   createUser,
   findUserByEmail,
 } from '@/lib/database';
-import { signupSchema } from '@/lib/validation';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    const { name, email, password } = signupSchema.parse(req.body);
+  const { email, name, password, confirmPassword } = req.body;
 
-    // Check if user already exists
-    const existingUser = findUserByEmail(email);
-
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists with this email' });
-    }
-
-    // Hash password
-    const hashedPassword = await hashPassword(password);
-
-    // Create user
-    const user = createUser({
-      name,
-      email,
-      password: hashedPassword,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'User created successfully',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        createdAt: user.createdAt,
-      },
-    });
-  } catch (error) {
-    console.error('Signup error:', error);
-    
-    if (error instanceof Error) {
-      return res.status(400).json({ error: error.message });
-    }
-    
-    res.status(500).json({ error: 'Internal server error' });
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
   }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ error: 'Passwords do not match' });
+  }
+
+  // Check if user already exists
+  const existingUser = await findUserByEmail(email);
+  if (existingUser) {
+    return res.status(409).json({ error: 'User already exists' });
+  }
+
+  // Hash the password
+  const hashedPassword = await hashPassword(password);
+
+  const user = await createUser({ 
+    email, 
+    name, 
+    password: hashedPassword 
+  });
+  
+  if (!user) {
+    return res.status(500).json({ error: 'Failed to create user' });
+  }
+
+  return res.status(201).json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    image: user.image,
+  });
 } 

@@ -40,22 +40,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
-    // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    const patients = findPatientsByUserId(actualUserId);
+    const patients = await findPatientsByUserId(actualUserId);
 
     // Transform for response with additional stats
-    const transformedPatients = patients.map(patient => {
+    const transformedPatients = await Promise.all(patients.map(async patient => {
       // Get recent entries for stats
-      const entries = findEntriesByPatientId(patient.id, 10, 0);
+      const entries = await findEntriesByPatientId(patient.id, 10, 0);
       const glucoseEntries = entries.filter(entry => entry.entryType === 'glucose');
       const lastGlucoseEntry = glucoseEntries[0]; // Most recent first
       
@@ -65,7 +64,11 @@ async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: st
       // Parse medications
       let medications = [];
       try {
-        medications = JSON.parse(patient.usualMedications || '[]');
+        if (typeof patient.usualMedications === 'string') {
+          medications = JSON.parse(patient.usualMedications);
+        } else {
+          medications = patient.usualMedications || [];
+        }
       } catch (error) {
         medications = [];
       }
@@ -89,7 +92,7 @@ async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: st
         recentEntries: entries.length,
         lastEntryDate: entries[0]?.occurredAt,
       };
-    });
+    }));
 
     res.status(200).json({
       success: true,
@@ -109,7 +112,7 @@ async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, u
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -140,10 +143,10 @@ async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, u
       diabetesType: validatedData.diabetesType,
       lifestyle: validatedData.lifestyle || '',
       activityLevel: validatedData.activityLevel || '',
-      usualMedications: validatedData.usualMedications || '[]',
+      usualMedications: JSON.parse(validatedData.usualMedications || '[]'),
     };
 
-    const newPatient = createPatient(patientData);
+    const newPatient = await createPatient(patientData);
 
     if (!newPatient) {
       return res.status(500).json({ error: 'Failed to create patient' });

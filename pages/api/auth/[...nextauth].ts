@@ -28,8 +28,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const user = findUserByEmail(credentials.email);
-
+          const user = await findUserByEmail(credentials.email);
           if (!user || !user.password) {
             return null;
           }
@@ -77,15 +76,14 @@ export const authOptions: NextAuthOptions = {
         }
         
         // Check if user exists, if not create them
-        const existingUser = findUserByEmail(user.email);
+        const existingUser = await findUserByEmail(user.email);
 
         if (!existingUser) {
           // Create new user from Google OAuth
-          createUser({
+          await createUser({
             email: user.email,
             name: user.name || '',
             image: user.image || '',
-            emailVerified: new Date(),
           });
         }
       }

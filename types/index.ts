@@ -6,6 +6,7 @@ export interface User {
   email: string;
   name?: string | null;
   image?: string | null;
+  password?: string | null;
 }
 
 // Medication types
@@ -24,6 +25,7 @@ export interface Patient {
   lifestyle?: string;
   activityLevel?: 'Low' | 'Moderate' | 'High';
   usualMedications: Medication[];
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
   age: number;

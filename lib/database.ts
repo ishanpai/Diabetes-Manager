@@ -1,82 +1,390 @@
-import Database from 'better-sqlite3';
-import { randomUUID } from 'crypto';
-import path from 'path';
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  lte,
+} from 'drizzle-orm';
 
-// Database types
-export interface User {
-  id: string;
-  name?: string;
-  email: string;
-  emailVerified?: Date;
-  image?: string;
-  password?: string;
-  createdAt: Date;
-  updatedAt: Date;
+import type {
+  Entry,
+  Patient,
+  Recommendation,
+  User,
+} from '@/types';
+
+import { db } from './db';
+import {
+  entries,
+  patients,
+  recommendations,
+  users,
+  userSettings,
+} from './schema';
+
+// User functions
+export async function findUserByEmail(email: string): Promise<User | null> {
+  try {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (result.length === 0) return null;
+    
+    const user = result[0];
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.image,
+      password: user.password,
+    };
+  } catch (error) {
+    console.error('Error finding user by email:', error);
+    return null;
+  }
 }
 
-export interface UserSettings {
-  id: string;
-  userId: string;
-  glucoseUnits: 'mg/dL' | 'mmol/L';
-  createdAt: Date;
-  updatedAt: Date;
+export async function findUsers(): Promise<User[]> {
+  try {
+    const result = await db.select().from(users);
+    return result.map(user => ({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.image,
+      password: user.password,
+    }));
+  } catch (error) {
+    console.error('Error finding users:', error);
+    return [];
+  }
 }
 
-export interface Account {
-  id: string;
-  userId: string;
-  type: string;
-  provider: string;
-  providerAccountId: string;
-  refresh_token?: string;
-  access_token?: string;
-  expires_at?: number;
-  token_type?: string;
-  scope?: string;
-  id_token?: string;
-  session_state?: string;
+export async function createUser(userData: { email: string; name?: string; image?: string; password?: string }): Promise<User | null> {
+  try {
+    const result = await db.insert(users).values(userData).returning();
+    if (result.length === 0) return null;
+    
+    const user = result[0];
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.image,
+      password: user.password,
+    };
+  } catch (error) {
+    console.error('Error creating user:', error);
+    return null;
+  }
 }
 
-export interface Session {
-  id: string;
-  sessionToken: string;
-  userId: string;
-  expires: Date;
+// Patient functions
+export async function findPatientsByUserId(userId: string, limit?: number, offset?: number): Promise<Patient[]> {
+  try {
+    const result = await db.select()
+      .from(patients)
+      .where(eq(patients.userId, userId))
+      .orderBy(desc(patients.createdAt))
+      .limit(limit || 1000)
+      .offset(offset || 0);
+    
+    return result.map(patient => ({
+      id: patient.id,
+      name: patient.name,
+      dob: patient.dob,
+      diabetesType: patient.diabetesType,
+      lifestyle: patient.lifestyle || undefined,
+      activityLevel: patient.activityLevel as 'Low' | 'Moderate' | 'High' | undefined,
+      usualMedications: patient.usualMedications || [],
+      userId: patient.userId,
+      createdAt: patient.createdAt || new Date(),
+      updatedAt: patient.updatedAt || new Date(),
+      age: calculateAge(patient.dob),
+    }));
+  } catch (error) {
+    console.error('Error finding patients by user ID:', error);
+    return [];
+  }
 }
 
-export interface VerificationToken {
-  identifier: string;
-  token: string;
-  expires: Date;
+export async function findPatientById(patientId: string): Promise<Patient | null> {
+  try {
+    const result = await db.select().from(patients).where(eq(patients.id, patientId)).limit(1);
+    if (result.length === 0) return null;
+    
+    const patient = result[0];
+    return {
+      id: patient.id,
+      name: patient.name,
+      dob: patient.dob,
+      diabetesType: patient.diabetesType,
+      lifestyle: patient.lifestyle || undefined,
+      activityLevel: patient.activityLevel as 'Low' | 'Moderate' | 'High' | undefined,
+      usualMedications: patient.usualMedications || [],
+      userId: patient.userId,
+      createdAt: patient.createdAt || new Date(),
+      updatedAt: patient.updatedAt || new Date(),
+      age: calculateAge(patient.dob),
+    };
+  } catch (error) {
+    console.error('Error finding patient by ID:', error);
+    return null;
+  }
 }
 
-export interface Patient {
-  id: string;
+export async function createPatient(patientData: {
   name: string;
   dob: Date;
   diabetesType: string;
   lifestyle?: string;
   activityLevel?: string;
-  usualMedications: string; // JSON string
-  createdAt: Date;
-  updatedAt: Date;
+  usualMedications: Array<{ brand: string; dosage: string; timing?: string }>;
   userId: string;
+}): Promise<Patient | null> {
+  try {
+    const result = await db.insert(patients).values(patientData).returning();
+    if (result.length === 0) return null;
+    
+    const patient = result[0];
+    return {
+      id: patient.id,
+      name: patient.name,
+      dob: patient.dob,
+      diabetesType: patient.diabetesType,
+      lifestyle: patient.lifestyle || undefined,
+      activityLevel: patient.activityLevel as 'Low' | 'Moderate' | 'High' | undefined,
+      usualMedications: patient.usualMedications || [],
+      userId: patient.userId,
+      createdAt: patient.createdAt || new Date(),
+      updatedAt: patient.updatedAt || new Date(),
+      age: calculateAge(patient.dob),
+    };
+  } catch (error) {
+    console.error('Error creating patient:', error);
+    return null;
+  }
 }
 
-export interface Entry {
-  id: string;
+export async function updatePatient(patientId: string, updates: Partial<{
+  name: string;
+  dob: Date;
+  diabetesType: string;
+  lifestyle: string;
+  activityLevel: string;
+  usualMedications: Array<{ brand: string; dosage: string; timing?: string }>;
+}>): Promise<Patient | null> {
+  try {
+    const result = await db.update(patients)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(patients.id, patientId))
+      .returning();
+    
+    if (result.length === 0) return null;
+    
+    const patient = result[0];
+    return {
+      id: patient.id,
+      name: patient.name,
+      dob: patient.dob,
+      diabetesType: patient.diabetesType,
+      lifestyle: patient.lifestyle || undefined,
+      activityLevel: patient.activityLevel as 'Low' | 'Moderate' | 'High' | undefined,
+      usualMedications: patient.usualMedications || [],
+      userId: patient.userId,
+      createdAt: patient.createdAt || new Date(),
+      updatedAt: patient.updatedAt || new Date(),
+      age: calculateAge(patient.dob),
+    };
+  } catch (error) {
+    console.error('Error updating patient:', error);
+    return null;
+  }
+}
+
+export async function deletePatient(patientId: string): Promise<boolean> {
+  try {
+    const result = await db.delete(patients).where(eq(patients.id, patientId)).returning();
+    return result.length > 0;
+  } catch (error) {
+    console.error('Error deleting patient:', error);
+    return false;
+  }
+}
+
+// Entry functions
+export async function findEntriesByPatientId(patientId: string, limit?: number, offset?: number): Promise<Entry[]> {
+  try {
+    const result = await db.select()
+      .from(entries)
+      .where(eq(entries.patientId, patientId))
+      .orderBy(desc(entries.occurredAt))
+      .limit(limit || 1000)
+      .offset(offset || 0);
+    
+    return result.map(entry => ({
+      id: entry.id,
+      patientId: entry.patientId,
+      entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
+      value: entry.value,
+      units: entry.units || undefined,
+      medicationBrand: entry.medicationBrand || undefined,
+      occurredAt: entry.occurredAt,
+      createdAt: entry.createdAt || new Date(),
+    }));
+  } catch (error) {
+    console.error('Error finding entries by patient ID:', error);
+    return [];
+  }
+}
+
+export async function findEntriesByDateRange(patientId: string, startDate: Date, endDate: Date): Promise<Entry[]> {
+  try {
+    const result = await db.select()
+      .from(entries)
+      .where(
+        and(
+          eq(entries.patientId, patientId),
+          gte(entries.occurredAt, startDate),
+          lte(entries.occurredAt, endDate)
+        )
+      )
+      .orderBy(desc(entries.occurredAt));
+    
+    return result.map(entry => ({
+      id: entry.id,
+      patientId: entry.patientId,
+      entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
+      value: entry.value,
+      units: entry.units || undefined,
+      medicationBrand: entry.medicationBrand || undefined,
+      occurredAt: entry.occurredAt,
+      createdAt: entry.createdAt || new Date(),
+    }));
+  } catch (error) {
+    console.error('Error finding entries by date range:', error);
+    return [];
+  }
+}
+
+export async function createEntry(entryData: {
   patientId: string;
-  entryType: string;
+  entryType: 'glucose' | 'meal' | 'insulin';
   value: string;
   units?: string;
   medicationBrand?: string;
   occurredAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
+}): Promise<Entry | null> {
+  try {
+    const result = await db.insert(entries).values(entryData).returning();
+    if (result.length === 0) return null;
+    
+    const entry = result[0];
+    return {
+      id: entry.id,
+      patientId: entry.patientId,
+      entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
+      value: entry.value,
+      units: entry.units || undefined,
+      medicationBrand: entry.medicationBrand || undefined,
+      occurredAt: entry.occurredAt,
+      createdAt: entry.createdAt || new Date(),
+    };
+  } catch (error) {
+    console.error('Error creating entry:', error);
+    return null;
+  }
 }
 
-export interface Recommendation {
-  id: string;
+export async function updateEntry(entryId: string, updates: Partial<{
+  value: string;
+  units: string;
+  medicationBrand: string;
+  occurredAt: Date;
+}>): Promise<Entry | null> {
+  try {
+    const result = await db.update(entries)
+      .set(updates)
+      .where(eq(entries.id, entryId))
+      .returning();
+    
+    if (result.length === 0) return null;
+    
+    const entry = result[0];
+    return {
+      id: entry.id,
+      patientId: entry.patientId,
+      entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
+      value: entry.value,
+      units: entry.units || undefined,
+      medicationBrand: entry.medicationBrand || undefined,
+      occurredAt: entry.occurredAt,
+      createdAt: entry.createdAt || new Date(),
+    };
+  } catch (error) {
+    console.error('Error updating entry:', error);
+    return null;
+  }
+}
+
+export async function deleteEntry(entryId: string): Promise<boolean> {
+  try {
+    const result = await db.delete(entries).where(eq(entries.id, entryId)).returning();
+    return result.length > 0;
+  } catch (error) {
+    console.error('Error deleting entry:', error);
+    return false;
+  }
+}
+
+export async function findEntryById(entryId: string): Promise<Entry | null> {
+  try {
+    const result = await db.select().from(entries).where(eq(entries.id, entryId)).limit(1);
+    if (result.length === 0) return null;
+    
+    const entry = result[0];
+    return {
+      id: entry.id,
+      patientId: entry.patientId,
+      entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
+      value: entry.value,
+      units: entry.units || undefined,
+      medicationBrand: entry.medicationBrand || undefined,
+      occurredAt: entry.occurredAt,
+      createdAt: entry.createdAt || new Date(),
+    };
+  } catch (error) {
+    console.error('Error finding entry by ID:', error);
+    return null;
+  }
+}
+
+// Recommendation functions
+export async function findRecommendationsByPatientId(patientId: string): Promise<Recommendation[]> {
+  try {
+    const result = await db.select()
+      .from(recommendations)
+      .where(eq(recommendations.patientId, patientId))
+      .orderBy(desc(recommendations.createdAt));
+    
+    return result.map(rec => ({
+      id: rec.id,
+      patientId: rec.patientId,
+      prompt: rec.prompt,
+      response: rec.response,
+      doseUnits: rec.doseUnits || undefined,
+      medicationName: rec.medicationName || undefined,
+      reasoning: rec.reasoning || undefined,
+      safetyNotes: rec.safetyNotes || undefined,
+      confidence: rec.confidence as 'high' | 'medium' | 'low' | undefined,
+      recommendedMonitoring: rec.recommendedMonitoring || undefined,
+      createdAt: rec.createdAt || new Date(),
+    }));
+  } catch (error) {
+    console.error('Error finding recommendations by patient ID:', error);
+    return [];
+  }
+}
+
+export async function createRecommendation(recommendationData: {
   patientId: string;
   prompt: string;
   response: string;
@@ -84,602 +392,156 @@ export interface Recommendation {
   medicationName?: string;
   reasoning?: string;
   safetyNotes?: string;
-  confidence?: string;
+  confidence?: 'high' | 'medium' | 'low';
   recommendedMonitoring?: string;
-  targetTime?: Date;
-  createdAt: Date;
-}
-
-// Database singleton
-let db: Database.Database | undefined;
-
-export function getDatabase(): Database.Database {
-  if (!db) {
-    const dbPath = process.env.DATABASE_URL?.replace('file:', '') || path.join(process.cwd(), 'data', 'diabetes.db');
-    db = new Database(dbPath);
-    
-    // Enable foreign keys
-    db.pragma('foreign_keys = ON');
-    
-    // Create tables if they don't exist
-    initializeTables();
-  }
-  return db;
-}
-
-function initializeTables() {
-  const database = getDatabase();
-  
-  // Users table
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT,
-      email TEXT UNIQUE NOT NULL,
-      emailVerified DATETIME,
-      image TEXT,
-      password TEXT,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Accounts table
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS accounts (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      type TEXT NOT NULL,
-      provider TEXT NOT NULL,
-      providerAccountId TEXT NOT NULL,
-      refresh_token TEXT,
-      access_token TEXT,
-      expires_at INTEGER,
-      token_type TEXT,
-      scope TEXT,
-      id_token TEXT,
-      session_state TEXT,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-      UNIQUE(provider, providerAccountId)
-    )
-  `);
-
-  // Sessions table
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      sessionToken TEXT UNIQUE NOT NULL,
-      userId TEXT NOT NULL,
-      expires DATETIME NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Verification tokens table
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS verification_tokens (
-      identifier TEXT NOT NULL,
-      token TEXT UNIQUE NOT NULL,
-      expires DATETIME NOT NULL,
-      PRIMARY KEY (identifier, token)
-    )
-  `);
-
-  // Patients table
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS patients (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      dob DATETIME NOT NULL,
-      diabetesType TEXT NOT NULL,
-      lifestyle TEXT,
-      activityLevel TEXT,
-      usualMedications TEXT NOT NULL,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      userId TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Entries table
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS entries (
-      id TEXT PRIMARY KEY,
-      patientId TEXT NOT NULL,
-      entryType TEXT NOT NULL,
-      value TEXT NOT NULL,
-      units TEXT,
-      medicationBrand TEXT,
-      occurredAt DATETIME NOT NULL,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Recommendations table
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS recommendations (
-      id TEXT PRIMARY KEY,
-      patientId TEXT NOT NULL,
-      prompt TEXT NOT NULL,
-      response TEXT NOT NULL,
-      doseUnits INTEGER,
-      medicationName TEXT,
-      reasoning TEXT,
-      safetyNotes TEXT,
-      confidence TEXT,
-      recommendedMonitoring TEXT,
-      targetTime DATETIME,
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
-    )
-  `);
-
-  // User settings table
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS user_settings (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      glucoseUnits TEXT NOT NULL DEFAULT 'mg/dL',
-      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-      UNIQUE(userId)
-    )
-  `);
-
-  // Migration: Add medicationName column to existing recommendations table if it doesn't exist
+}): Promise<Recommendation | null> {
   try {
-    database.exec(`ALTER TABLE recommendations ADD COLUMN medicationName TEXT`);
-    console.log('Added medicationName column to recommendations table');
+    const result = await db.insert(recommendations).values(recommendationData).returning();
+    if (result.length === 0) return null;
+    
+    const rec = result[0];
+    return {
+      id: rec.id,
+      patientId: rec.patientId,
+      prompt: rec.prompt,
+      response: rec.response,
+      doseUnits: rec.doseUnits || undefined,
+      medicationName: rec.medicationName || undefined,
+      reasoning: rec.reasoning || undefined,
+      safetyNotes: rec.safetyNotes || undefined,
+      confidence: rec.confidence as 'high' | 'medium' | 'low' | undefined,
+      recommendedMonitoring: rec.recommendedMonitoring || undefined,
+      createdAt: rec.createdAt || new Date(),
+    };
   } catch (error) {
-    // Column already exists, ignore the error
-    console.log('medicationName column already exists in recommendations table');
+    console.error('Error creating recommendation:', error);
+    return null;
   }
 }
 
-function generateId(prefix: string): string {
-  return `${prefix}${randomUUID()}`;
-}
-
-// User functions
-export function findUserByEmail(email: string): User | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare('SELECT * FROM users WHERE email = ?');
-  const user = stmt.get(email) as User | undefined;
-  return user ? { ...user, createdAt: new Date(user.createdAt), updatedAt: new Date(user.updatedAt) } : undefined;
-}
-
-export function findUserById(id: string): User | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare('SELECT * FROM users WHERE id = ?');
-  const user = stmt.get(id) as User | undefined;
-  return user ? { ...user, createdAt: new Date(user.createdAt), updatedAt: new Date(user.updatedAt) } : undefined;
-}
-
-export function createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): User {
-  const database = getDatabase();
-  const id = generateId('usr_');
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    INSERT INTO users (id, name, email, emailVerified, image, password, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const name = userData.name ?? null;
-  const emailVerified = userData.emailVerified ? 
-    (userData.emailVerified instanceof Date ? userData.emailVerified.toISOString() : new Date(userData.emailVerified).toISOString()) 
-    : null;
-  const image = userData.image ?? null;
-  const password = userData.password ?? null;
-  
-  stmt.run(id, name, userData.email, emailVerified, image, password, now.toISOString(), now.toISOString());
-  
-  return {
-    id,
-    ...userData,
-    createdAt: now,
-    updatedAt: now
-  };
-}
-
-// Account functions
-export function createAccount(accountData: Omit<Account, 'id'>): Account {
-  const database = getDatabase();
-  const id = generateId('acc_');
-  
-  const stmt = database.prepare(`
-    INSERT INTO accounts (id, userId, type, provider, providerAccountId, refresh_token, access_token, expires_at, token_type, scope, id_token, session_state)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const refresh_token = accountData.refresh_token ?? null;
-  const access_token = accountData.access_token ?? null;
-  const expires_at = accountData.expires_at ?? null;
-  const token_type = accountData.token_type ?? null;
-  const scope = accountData.scope ?? null;
-  const id_token = accountData.id_token ?? null;
-  const session_state = accountData.session_state ?? null;
-  
-  stmt.run(id, accountData.userId, accountData.type, accountData.provider, accountData.providerAccountId,
-    refresh_token, access_token, expires_at, token_type, scope, id_token, session_state);
-  
-  return { id, ...accountData };
-}
-
-export function findAccountByProvider(provider: string, providerAccountId: string): Account | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare('SELECT * FROM accounts WHERE provider = ? AND providerAccountId = ?');
-  return stmt.get(provider, providerAccountId) as Account | undefined;
-}
-
-// Session functions
-export function createSession(sessionData: Omit<Session, 'id'>): Session {
-  const database = getDatabase();
-  const id = generateId('ses_');
-  
-  const stmt = database.prepare(`
-    INSERT INTO sessions (id, sessionToken, userId, expires)
-    VALUES (?, ?, ?, ?)
-  `);
-  
-  // Convert date to ISO string for SQLite compatibility
-  const expires = sessionData.expires instanceof Date ? sessionData.expires.toISOString() : new Date(sessionData.expires).toISOString();
-  
-  stmt.run(id, sessionData.sessionToken, sessionData.userId, expires);
-  
-  return { id, ...sessionData };
-}
-
-export function findSessionByToken(sessionToken: string): Session | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare('SELECT * FROM sessions WHERE sessionToken = ?');
-  const session = stmt.get(sessionToken) as Session | undefined;
-  return session ? { ...session, expires: new Date(session.expires) } : undefined;
-}
-
-export function deleteSession(sessionToken: string): void {
-  const database = getDatabase();
-  const stmt = database.prepare('DELETE FROM sessions WHERE sessionToken = ?');
-  stmt.run(sessionToken);
-}
-
-// Patient functions
-export function findPatientsByUserId(userId: string): Patient[] {
-  const database = getDatabase();
-  const stmt = database.prepare(`
-    SELECT * FROM patients 
-    WHERE userId = ? 
-    ORDER BY updatedAt DESC
-  `);
-  const patients = stmt.all(userId) as Patient[];
-  return patients.map(p => ({ ...p, createdAt: new Date(p.createdAt), updatedAt: new Date(p.updatedAt), dob: new Date(p.dob) }));
-}
-
-export function findPatientById(id: string): Patient | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare('SELECT * FROM patients WHERE id = ?');
-  const patient = stmt.get(id) as Patient | undefined;
-  return patient ? { ...patient, createdAt: new Date(patient.createdAt), updatedAt: new Date(patient.updatedAt), dob: new Date(patient.dob) } : undefined;
-}
-
-export function createPatient(patientData: Omit<Patient, 'id' | 'createdAt' | 'updatedAt'>): Patient {
-  const database = getDatabase();
-  const id = generateId('pat_');
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    INSERT INTO patients (id, name, dob, diabetesType, lifestyle, activityLevel, usualMedications, userId, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const lifestyle = patientData.lifestyle ?? null;
-  const activityLevel = patientData.activityLevel ?? null;
-  
-  // Convert dates to ISO strings for SQLite
-  const dob = patientData.dob instanceof Date ? patientData.dob.toISOString() : new Date(patientData.dob).toISOString();
-  
-  stmt.run(id, patientData.name, dob, patientData.diabetesType, lifestyle,
-    activityLevel, patientData.usualMedications, patientData.userId, now.toISOString(), now.toISOString());
-  
-  return {
-    id,
-    ...patientData,
-    createdAt: now,
-    updatedAt: now
-  };
-}
-
-export function updatePatient(id: string, patientData: Partial<Omit<Patient, 'id' | 'createdAt' | 'updatedAt'>>): Patient | undefined {
-  const database = getDatabase();
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    UPDATE patients 
-    SET name = COALESCE(?, name), dob = COALESCE(?, dob), diabetesType = COALESCE(?, diabetesType),
-        lifestyle = COALESCE(?, lifestyle), activityLevel = COALESCE(?, activityLevel),
-        usualMedications = COALESCE(?, usualMedications), updatedAt = ?
-    WHERE id = ?
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const name = patientData.name ?? null;
-  const dob = patientData.dob 
-    ? (patientData.dob instanceof Date ? patientData.dob.toISOString() : new Date(patientData.dob).toISOString())
-    : null;
-  const diabetesType = patientData.diabetesType ?? null;
-  const lifestyle = patientData.lifestyle ?? null;
-  const activityLevel = patientData.activityLevel ?? null;
-  const usualMedications = patientData.usualMedications ?? null;
-  
-  const result = stmt.run(name, dob, diabetesType, lifestyle, activityLevel, usualMedications, now.toISOString(), id);
-  
-  if (result.changes > 0) {
-    return findPatientById(id);
+export async function updateRecommendation(recommendationId: string, updates: Partial<{
+  prompt: string;
+  response: string;
+  doseUnits: number;
+  medicationName: string;
+  reasoning: string;
+  safetyNotes: string;
+  confidence: 'high' | 'medium' | 'low';
+  recommendedMonitoring: string;
+}>): Promise<Recommendation | null> {
+  try {
+    const result = await db.update(recommendations)
+      .set(updates)
+      .where(eq(recommendations.id, recommendationId))
+      .returning();
+    
+    if (result.length === 0) return null;
+    
+    const rec = result[0];
+    return {
+      id: rec.id,
+      patientId: rec.patientId,
+      prompt: rec.prompt,
+      response: rec.response,
+      doseUnits: rec.doseUnits || undefined,
+      medicationName: rec.medicationName || undefined,
+      reasoning: rec.reasoning || undefined,
+      safetyNotes: rec.safetyNotes || undefined,
+      confidence: rec.confidence as 'high' | 'medium' | 'low' | undefined,
+      recommendedMonitoring: rec.recommendedMonitoring || undefined,
+      createdAt: rec.createdAt || new Date(),
+    };
+  } catch (error) {
+    console.error('Error updating recommendation:', error);
+    return null;
   }
-  return undefined;
 }
 
-export function deletePatient(id: string): boolean {
-  const database = getDatabase();
-  const stmt = database.prepare('DELETE FROM patients WHERE id = ?');
-  const result = stmt.run(id);
-  return result.changes > 0;
-}
-
-// Entry functions
-export function findEntriesByPatientId(patientId: string, limit = 10, offset = 0): Entry[] {
-  const database = getDatabase();
-  const stmt = database.prepare(`
-    SELECT * FROM entries 
-    WHERE patientId = ? 
-    ORDER BY updatedAt DESC
-    LIMIT ? OFFSET ?
-  `);
-  const entries = stmt.all(patientId, limit, offset) as Entry[];
-  return entries.map(e => ({ ...e, occurredAt: new Date(e.occurredAt), createdAt: new Date(e.createdAt), updatedAt: new Date(e.updatedAt) }));
-}
-
-export function findEntryById(id: string): Entry | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare('SELECT * FROM entries WHERE id = ?');
-  const entry = stmt.get(id) as Entry | undefined;
-  return entry ? { ...entry, occurredAt: new Date(entry.occurredAt), createdAt: new Date(entry.createdAt), updatedAt: new Date(entry.updatedAt) } : undefined;
-}
-
-export function createEntry(entryData: Omit<Entry, 'id' | 'createdAt' | 'updatedAt'>): Entry {
-  const database = getDatabase();
-  const id = generateId('ent_');
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    INSERT INTO entries (id, patientId, entryType, value, units, medicationBrand, occurredAt, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const units = entryData.units ?? null;
-  const medicationBrand = entryData.medicationBrand ?? null;
-  
-  // Convert dates to ISO strings for SQLite
-  const occurredAt = entryData.occurredAt instanceof Date ? entryData.occurredAt.toISOString() : new Date(entryData.occurredAt).toISOString();
-  
-  stmt.run(id, entryData.patientId, entryData.entryType, entryData.value, units, medicationBrand, occurredAt, now.toISOString(), now.toISOString());
-  
-  return {
-    id,
-    ...entryData,
-    createdAt: now,
-    updatedAt: now
-  };
-}
-
-export function updateEntry(id: string, entryData: Partial<Omit<Entry, 'id' | 'createdAt' | 'updatedAt'>>): Entry | undefined {
-  const database = getDatabase();
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    UPDATE entries 
-    SET patientId = COALESCE(?, patientId), entryType = COALESCE(?, entryType), value = COALESCE(?, value),
-        units = COALESCE(?, units), medicationBrand = COALESCE(?, medicationBrand), occurredAt = COALESCE(?, occurredAt),
-        updatedAt = ?
-    WHERE id = ?
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const patientId = entryData.patientId ?? null;
-  const entryType = entryData.entryType ?? null;
-  const value = entryData.value ?? null;
-  const units = entryData.units ?? null;
-  const medicationBrand = entryData.medicationBrand ?? null;
-  const occurredAt = entryData.occurredAt 
-    ? (entryData.occurredAt instanceof Date ? entryData.occurredAt.toISOString() : new Date(entryData.occurredAt).toISOString())
-    : null;
-  
-  const result = stmt.run(patientId, entryType, value, units, medicationBrand, occurredAt, now.toISOString(), id);
-  
-  if (result.changes > 0) {
-    return findEntryById(id);
+export async function deleteRecommendation(recommendationId: string): Promise<boolean> {
+  try {
+    const result = await db.delete(recommendations).where(eq(recommendations.id, recommendationId)).returning();
+    return result.length > 0;
+  } catch (error) {
+    console.error('Error deleting recommendation:', error);
+    return false;
   }
-  return undefined;
-}
-
-export function deleteEntry(id: string): boolean {
-  const database = getDatabase();
-  const stmt = database.prepare('DELETE FROM entries WHERE id = ?');
-  const result = stmt.run(id);
-  return result.changes > 0;
-}
-
-// Recommendation functions
-export function findRecommendationsByPatientId(patientId: string, limit = 10, offset = 0): Recommendation[] {
-  const database = getDatabase();
-  const stmt = database.prepare(`
-    SELECT * FROM recommendations 
-    WHERE patientId = ? 
-    ORDER BY updatedAt DESC
-    LIMIT ? OFFSET ?
-  `);
-  const recommendations = stmt.all(patientId, limit, offset) as Recommendation[];
-  return recommendations.map(r => ({ ...r, createdAt: new Date(r.createdAt) }));
-}
-
-export function findRecommendationById(id: string): Recommendation | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare('SELECT * FROM recommendations WHERE id = ?');
-  const recommendation = stmt.get(id) as Recommendation | undefined;
-  return recommendation ? { ...recommendation, createdAt: new Date(recommendation.createdAt) } : undefined;
-}
-
-export function createRecommendation(recommendationData: Omit<Recommendation, 'id' | 'createdAt'>): Recommendation {
-  const database = getDatabase();
-  const id = generateId('rec_');
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    INSERT INTO recommendations (id, patientId, prompt, response, doseUnits, medicationName, reasoning, safetyNotes, confidence, recommendedMonitoring, targetTime, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const doseUnits = recommendationData.doseUnits ?? null;
-  const medicationName = recommendationData.medicationName ?? null;
-  const reasoning = recommendationData.reasoning ?? null;
-  const safetyNotes = recommendationData.safetyNotes ?? null;
-  const confidence = recommendationData.confidence ?? null;
-  const recommendedMonitoring = recommendationData.recommendedMonitoring ?? null;
-  const targetTime = recommendationData.targetTime
-    ? (recommendationData.targetTime instanceof Date
-        ? recommendationData.targetTime.toISOString()
-        : new Date(recommendationData.targetTime).toISOString())
-    : null;
-  
-  stmt.run(id, recommendationData.patientId, recommendationData.prompt, recommendationData.response, doseUnits, medicationName, reasoning, safetyNotes, confidence, recommendedMonitoring, targetTime, now.toISOString());
-  
-  return {
-    id,
-    ...recommendationData,
-    createdAt: now
-  };
-}
-
-export function updateRecommendation(id: string, recommendationData: Partial<Omit<Recommendation, 'id' | 'createdAt'>>): Recommendation | undefined {
-  const database = getDatabase();
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    UPDATE recommendations 
-    SET patientId = COALESCE(?, patientId), prompt = COALESCE(?, prompt), response = COALESCE(?, response),
-        doseUnits = COALESCE(?, doseUnits), medicationName = COALESCE(?, medicationName), reasoning = COALESCE(?, reasoning),
-        safetyNotes = COALESCE(?, safetyNotes), confidence = COALESCE(?, confidence), recommendedMonitoring = COALESCE(?, recommendedMonitoring),
-        targetTime = COALESCE(?, targetTime), updatedAt = ?
-    WHERE id = ?
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const patientId = recommendationData.patientId ?? null;
-  const prompt = recommendationData.prompt ?? null;
-  const response = recommendationData.response ?? null;
-  const doseUnits = recommendationData.doseUnits ?? null;
-  const medicationName = recommendationData.medicationName ?? null;
-  const reasoning = recommendationData.reasoning ?? null;
-  const safetyNotes = recommendationData.safetyNotes ?? null;
-  const confidence = recommendationData.confidence ?? null;
-  const recommendedMonitoring = recommendationData.recommendedMonitoring ?? null;
-  const targetTime = recommendationData.targetTime
-    ? (recommendationData.targetTime instanceof Date
-        ? recommendationData.targetTime.toISOString()
-        : new Date(recommendationData.targetTime).toISOString())
-    : null;
-  
-  const result = stmt.run(patientId, prompt, response, doseUnits, medicationName, reasoning, safetyNotes, confidence, recommendedMonitoring, targetTime, now.toISOString(), id);
-  
-  if (result.changes > 0) {
-    return findRecommendationById(id);
-  }
-  return undefined;
-}
-
-export function deleteRecommendation(id: string): boolean {
-  const database = getDatabase();
-  const stmt = database.prepare('DELETE FROM recommendations WHERE id = ?');
-  const result = stmt.run(id);
-  return result.changes > 0;
 }
 
 // User settings functions
-export function findUserSettingsByUserId(userId: string): UserSettings | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare('SELECT * FROM user_settings WHERE userId = ?');
-  const settings = stmt.get(userId) as UserSettings | undefined;
-  return settings ? { 
-    ...settings, 
-    createdAt: new Date(settings.createdAt), 
-    updatedAt: new Date(settings.updatedAt) 
-  } : undefined;
-}
-
-export function createUserSettings(settingsData: Omit<UserSettings, 'id' | 'createdAt' | 'updatedAt'>): UserSettings {
-  const database = getDatabase();
-  const id = generateId('set_');
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    INSERT INTO user_settings (id, userId, glucoseUnits, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-  
-  stmt.run(id, settingsData.userId, settingsData.glucoseUnits, now.toISOString(), now.toISOString());
-  
-  return {
-    id,
-    ...settingsData,
-    createdAt: now,
-    updatedAt: now
-  };
-}
-
-export function updateUserSettings(userId: string, settingsData: Partial<Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): UserSettings | undefined {
-  const database = getDatabase();
-  const now = new Date();
-  
-  const stmt = database.prepare(`
-    UPDATE user_settings 
-    SET glucoseUnits = COALESCE(?, glucoseUnits), updatedAt = ?
-    WHERE userId = ?
-  `);
-  
-  // Convert undefined values to null for SQLite compatibility
-  const glucoseUnits = settingsData.glucoseUnits ?? null;
-  
-  const result = stmt.run(glucoseUnits, now.toISOString(), userId);
-  
-  if (result.changes > 0) {
-    return findUserSettingsByUserId(userId);
+export async function findUserSettings(userId: string): Promise<{ glucoseUnits: string } | null> {
+  try {
+    const result = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+    if (result.length === 0) return null;
+    
+    return {
+      glucoseUnits: result[0].glucoseUnits,
+    };
+  } catch (error) {
+    console.error('Error finding user settings:', error);
+    return null;
   }
-  return undefined;
 }
 
-export function upsertUserSettings(userId: string, settingsData: Partial<Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>): UserSettings {
-  const existingSettings = findUserSettingsByUserId(userId);
-  
-  if (existingSettings) {
-    const updatedSettings = updateUserSettings(userId, settingsData);
-    if (updatedSettings) {
-      return updatedSettings;
+export async function createUserSettings(userId: string, glucoseUnits: string = 'mg/dL'): Promise<{ glucoseUnits: string } | null> {
+  try {
+    const result = await db.insert(userSettings).values({ userId, glucoseUnits }).returning();
+    if (result.length === 0) return null;
+    
+    return {
+      glucoseUnits: result[0].glucoseUnits,
+    };
+  } catch (error) {
+    console.error('Error creating user settings:', error);
+    return null;
+  }
+}
+
+export async function updateUserSettings(userId: string, glucoseUnits: string): Promise<{ glucoseUnits: string } | null> {
+  try {
+    const result = await db.update(userSettings)
+      .set({ glucoseUnits, updatedAt: new Date() })
+      .where(eq(userSettings.userId, userId))
+      .returning();
+    
+    if (result.length === 0) return null;
+    
+    return {
+      glucoseUnits: result[0].glucoseUnits,
+    };
+  } catch (error) {
+    console.error('Error updating user settings:', error);
+    return null;
+  }
+}
+
+export async function findUserSettingsByUserId(userId: string): Promise<{ glucoseUnits: string } | null> {
+  return findUserSettings(userId);
+}
+
+export async function upsertUserSettings(userId: string, glucoseUnits: string): Promise<{ glucoseUnits: string } | null> {
+  try {
+    const existingSettings = await findUserSettings(userId);
+    
+    if (existingSettings) {
+      return updateUserSettings(userId, glucoseUnits);
+    } else {
+      return createUserSettings(userId, glucoseUnits);
     }
-    // Fallback to existing settings if update failed
-    return existingSettings;
-  } else {
-    return createUserSettings({
-      userId,
-      glucoseUnits: settingsData.glucoseUnits || 'mg/dL',
-    });
+  } catch (error) {
+    console.error('Error upserting user settings:', error);
+    return null;
   }
+}
+
+// Helper function
+function calculateAge(dob: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  
+  return age;
 }

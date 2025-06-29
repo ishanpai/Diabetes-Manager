@@ -89,7 +89,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return sendError('User not found');
       }
@@ -119,7 +119,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     // Verify patient exists and belongs to user
     sendProgress('gathering-data', 'Loading patient data...');
     await new Promise(resolve => setTimeout(resolve, 300));
-    const patient = findPatientById(patientId);
+    const patient = await findPatientById(patientId);
     if (!patient) {
       return sendError('Patient not found');
     }
@@ -131,12 +131,18 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     // Get recent entries for the last 72 hours
     sendProgress('gathering-data', 'Loading recent entries...');
     await new Promise(resolve => setTimeout(resolve, 400));
-    const entries = findEntriesByPatientId(patientId);
+    const entries = await findEntriesByPatientId(patientId);
     const recentEntries = entries.filter(entry => 
       new Date(entry.occurredAt) >= new Date(Date.now() - 72 * 60 * 60 * 1000)
     );
     console.log('Recent entries count:', recentEntries.length);
     sendProgress('gathering-data', `Found ${recentEntries.length} recent entries`);
+
+    // Check if patient has sufficient history for recommendations
+    const hasSufficientHistory = checkSufficientHistory(entries);
+    if (!hasSufficientHistory.hasSufficientHistory) {
+      return sendError(hasSufficientHistory.message);
+    }
 
     // Build the prompt for the AI model
     sendProgress('building-prompt', 'Building AI prompt...');
@@ -155,7 +161,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     // Parse and save the recommendation
     sendProgress('parsing-response', 'Processing recommendation...');
     await new Promise(resolve => setTimeout(resolve, 400));
-    const savedRecommendation = createRecommendation({
+    const savedRecommendation = await createRecommendation({
       patientId,
       prompt,
       response: aiRecommendation.reasoning,
@@ -165,8 +171,11 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
       safetyNotes: aiRecommendation.safetyNotes,
       confidence: aiRecommendation.confidence,
       recommendedMonitoring: aiRecommendation.recommendedMonitoring,
-      targetTime: targetDateTime,
     });
+
+    if (!savedRecommendation) {
+      return sendError('Failed to save recommendation');
+    }
 
     console.log('Recommendation saved to database');
     sendProgress('parsing-response', 'Recommendation saved');
@@ -182,7 +191,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
       confidence: savedRecommendation.confidence,
       recommendedMonitoring: savedRecommendation.recommendedMonitoring,
       createdAt: savedRecommendation.createdAt,
-      targetTime: savedRecommendation.targetTime,
+      targetTime: targetDateTime,
     };
 
     sendResult(result);
@@ -200,10 +209,16 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
 }
 
 function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Date) {
-  // Parse usualMedications from JSON string
+  // Handle usualMedications - it could be a JSON string or already an object/array
   let medications = [];
   try {
-    medications = JSON.parse(patient.usualMedications || '[]');
+    if (typeof patient.usualMedications === 'string') {
+      medications = JSON.parse(patient.usualMedications || '[]');
+    } else if (Array.isArray(patient.usualMedications)) {
+      medications = patient.usualMedications;
+    } else {
+      medications = [];
+    }
   } catch (error) {
     console.error('Error parsing usualMedications:', error);
     medications = [];
@@ -477,4 +492,43 @@ async function getAIRecommendation(prompt: string) {
       recommendedMonitoring: 'Consult healthcare provider immediately',
     };
   }
+}
+
+function checkSufficientHistory(entries: any[]): { hasSufficientHistory: boolean; message: string } {
+  const totalEntries = entries.length;
+  
+  if (totalEntries === 0) {
+    return {
+      hasSufficientHistory: false,
+      message: "No patient history found. Please add at least 1 day of glucose readings, meals, and insulin doses before getting recommendations."
+    };
+  }
+  
+  if (totalEntries < 3) {
+    return {
+      hasSufficientHistory: false,
+      message: `Only ${totalEntries} entries found. Please add at least 3 entries (glucose, meals, insulin) over at least 1 day before getting recommendations.`
+    };
+  }
+  
+  // Check if we have entries from at least 1 day ago
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  
+  const hasHistoricalData = entries.some(entry => {
+    const entryDate = new Date(entry.occurredAt);
+    return entryDate < oneDayAgo;
+  });
+  
+  if (!hasHistoricalData) {
+    return {
+      hasSufficientHistory: false,
+      message: "All entries are from today. Please add entries from at least 1 day ago to provide better context for recommendations."
+    };
+  }
+  
+  return {
+    hasSufficientHistory: true,
+    message: "Sufficient history available for recommendations."
+  };
 } 

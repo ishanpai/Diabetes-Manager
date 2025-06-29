@@ -52,20 +52,20 @@ async function getEntry(req: NextApiRequest, res: NextApiResponse, userId: strin
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
       actualUserId = user.id;
     }
 
-    const entry = findEntryById(entryId);
+    const entry = await findEntryById(entryId);
     if (!entry) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
     // Verify the entry belongs to a patient owned by the user
-    const patient = findPatientById(entry.patientId);
+    const patient = await findPatientById(entry.patientId);
     if (!patient || patient.userId !== actualUserId) {
       return res.status(404).json({ error: 'Entry not found' });
     }
@@ -97,7 +97,7 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -105,12 +105,12 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     }
 
     // Verify the entry belongs to a patient owned by the user
-    const existingEntry = findEntryById(entryId);
+    const existingEntry = await findEntryById(entryId);
     if (!existingEntry) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
-    const patient = findPatientById(existingEntry.patientId);
+    const patient = await findPatientById(existingEntry.patientId);
     if (!patient || patient.userId !== actualUserId) {
       return res.status(404).json({ error: 'Entry not found' });
     }
@@ -156,7 +156,7 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
       updateData.medicationBrand = validatedData.medicationBrand;
     }
 
-    const updatedEntry = updateEntry(entryId, updateData);
+    const updatedEntry = await updateEntry(entryId, updateData);
 
     if (!updatedEntry) {
       return res.status(404).json({ error: 'Entry not found' });
@@ -194,7 +194,7 @@ async function deleteEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
-      const user = findUserByEmail(userId);
+      const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -202,17 +202,17 @@ async function deleteEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     }
 
     // Verify the entry belongs to a patient owned by the user
-    const entry = findEntryById(entryId);
+    const entry = await findEntryById(entryId);
     if (!entry) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
-    const patient = findPatientById(entry.patientId);
+    const patient = await findPatientById(entry.patientId);
     if (!patient || patient.userId !== actualUserId) {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
-    const success = deleteEntry(entryId);
+    const success = await deleteEntry(entryId);
 
     if (!success) {
       return res.status(404).json({ error: 'Entry not found' });
