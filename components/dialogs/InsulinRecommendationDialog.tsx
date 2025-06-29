@@ -99,6 +99,7 @@ export function InsulinRecommendationDialog({
         body: JSON.stringify({
           patientId,
           targetTime: targetTime.toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
 

@@ -22,10 +22,11 @@ const openai = new (require('openai')).default({
 const recommendSchema = z.object({
   patientId: z.string().min(1, 'Patient ID is required'),
   targetTime: z.string().optional(), // ISO string for target time
+  timezone: z.string().optional(),
 });
 
 // Utility function to format date in local time
-function formatLocalTime(date: Date): string {
+function formatLocalTime(date: Date, timeZone: string = 'UTC'): string {
   return date.toLocaleString('en-US', {
     year: 'numeric',
     month: '2-digit',
@@ -33,7 +34,8 @@ function formatLocalTime(date: Date): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
-    timeZoneName: 'short'
+    timeZoneName: 'short',
+    timeZone,
   });
 }
 
@@ -105,8 +107,9 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
       return sendError('Validation failed');
     }
 
-    const { patientId, targetTime } = validatedData;
-    console.log('Validated data:', { patientId, targetTime });
+    const { patientId, targetTime, timezone } = validatedData;
+    const userTimezone = timezone || 'UTC';
+    console.log('Validated data:', { patientId, targetTime, timezone });
 
     // Parse target time if provided
     const targetDateTime = targetTime ? new Date(targetTime) : new Date();
@@ -147,7 +150,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     // Build the prompt for the AI model
     sendProgress('building-prompt', 'Building AI prompt...');
     await new Promise(resolve => setTimeout(resolve, 400));
-    const prompt = buildRecommendationPrompt(patient, recentEntries, targetDateTime);
+    const prompt = buildRecommendationPrompt(patient, recentEntries, targetDateTime, userTimezone);
     sendProgress('building-prompt', 'Prompt built successfully');
     await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -208,7 +211,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
   }
 }
 
-function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Date) {
+function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Date, timeZone: string) {
   // Handle usualMedications - it could be a JSON string or already an object/array
   let medications = [];
   try {
@@ -244,7 +247,7 @@ function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Dat
 
   const targetTimeInfo = `
 <TARGET_TIME>
-Target Administration Time: ${formatLocalTime(targetTime)}
+Target Administration Time: ${formatLocalTime(targetTime, timeZone)}
 </TARGET_TIME>
 `;
 
@@ -253,7 +256,7 @@ Target Administration Time: ${formatLocalTime(targetTime)}
 Recent History (Last 72 hours):
 ${entries.map(entry => `<${entry.entryType.toUpperCase()}>
     <VALUE>${entry.value}${entry.units ? ` ${entry.units}` : ''} ${entry.medicationBrand ? `(${entry.medicationBrand})` : ''}</VALUE>
-    <OCCURRED_AT>${formatLocalTime(entry.occurredAt)}</OCCURRED_AT>
+    <OCCURRED_AT>${formatLocalTime(new Date(entry.occurredAt), timeZone)}</OCCURRED_AT>
     </${entry.entryType.toUpperCase()}>`).join('\n')}
 </RECENT_HISTORY>`
     : `<RECENT_HISTORY>
