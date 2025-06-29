@@ -7,6 +7,7 @@ import {
   EntryForm,
   EntryFormValues,
 } from '@/components/EntryForm';
+import { useSettings } from '@/hooks/useSettings';
 import {
   Entry,
   Medication,
@@ -32,6 +33,7 @@ export function EditEntryDialog({
   patientMedications,
   onSuccess,
 }: EditEntryDialogProps) {
+  const { settings } = useSettings();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [defaultValues, setDefaultValues] = useState<Partial<EntryFormValues>>({});
@@ -58,6 +60,10 @@ export function EditEntryDialog({
     setError(null);
 
     try {
+      let units = data.units;
+      if (entry.entryType === 'glucose') {
+        units = settings?.glucoseUnits || 'mg/dL';
+      }
       const response = await fetch(`/api/entries/${entry.id}`, {
         method: 'PUT',
         headers: {
@@ -66,7 +72,7 @@ export function EditEntryDialog({
         body: JSON.stringify({
           entryType: entry.entryType,
           value: data.value,
-          units: data.units,
+          units,
           medicationBrand: entry.entryType === 'insulin' ? data.medicationBrand : undefined,
           occurredAt: data.occurredAt.toISOString(),
         }),

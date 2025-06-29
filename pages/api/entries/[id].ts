@@ -120,6 +120,7 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
       z.object({
         entryType: z.literal('glucose'),
         value: z.string().min(1, 'Glucose value is required'),
+        units: z.enum(['mg/dL', 'mmol/L']),
         occurredAt: z.string().or(z.date()),
       }),
       z.object({
@@ -154,6 +155,8 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     if (validatedData.entryType === 'insulin') {
       updateData.units = validatedData.units;
       updateData.medicationBrand = validatedData.medicationBrand;
+    } else if (validatedData.entryType === 'glucose') {
+      updateData.units = validatedData.units;
     }
 
     const updatedEntry = await updateEntry(entryId, updateData);

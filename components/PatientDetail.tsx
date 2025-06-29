@@ -11,6 +11,7 @@ import {
   InsulinRecommendationDialog,
 } from '@/components/dialogs/InsulinRecommendationDialog';
 import { EntriesTable } from '@/components/EntriesTable';
+import { GlucoseChart } from '@/components/GlucoseChart';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorDisplay } from '@/components/ui/ErrorDisplay';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -383,6 +384,18 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
               )}
             </CardContent>
           </Card>
+        </Grid>
+
+        {/* Glucose Chart - Full Width Below */}
+        <Grid item xs={12}>
+          <Box mt={2}>
+            <GlucoseChart
+              patientId={patientId}
+              entries={entries}
+              loading={entriesLoading}
+              error={null}
+            />
+          </Box>
         </Grid>
       </Grid>
 
