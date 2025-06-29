@@ -6,9 +6,9 @@ import { getServerSession } from 'next-auth/next';
 import { z } from 'zod';
 
 import {
+  countEntriesByPatientId,
   createEntry,
   findEntriesByPatientId,
-  findPatientsByUserId,
   findUserByEmail,
 } from '@/lib/database';
 
@@ -40,118 +40,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
-    // If userId is an email, find the user first
-    let actualUserId = userId;
-    if (userId.includes('@')) {
-      const user = await findUserByEmail(userId);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      actualUserId = user.id;
+    const { patientId, limit, offset } = req.query;
+
+    if (!patientId || typeof patientId !== 'string') {
+      return res.status(400).json({ success: false, error: 'Patient ID is required' });
     }
 
-    // Get query parameters
-    const { patientId, limit = 10, offset = 0, entryType, date, startDate, endDate } = req.query;
-    const limitNum = parseInt(limit as string, 10);
-    const offsetNum = parseInt(offset as string, 10);
+    const parsedLimit = limit ? parseInt(limit as string, 10) : 25;
+    const parsedOffset = offset ? parseInt(offset as string, 10) : 0;
 
-    let entries = [];
+    // Get total count and entries in parallel
+    const [totalCount, entries] = await Promise.all([
+      countEntriesByPatientId(patientId),
+      findEntriesByPatientId(patientId, parsedLimit, parsedOffset)
+    ]);
 
-    if (patientId && typeof patientId === 'string') {
-      // Get entries for a specific patient
-      // First verify the patient belongs to the user
-      const patients = await findPatientsByUserId(actualUserId);
-      const patient = patients.find(p => p.id === patientId);
-      
-      if (!patient) {
-        return res.status(404).json({ error: 'Patient not found or access denied' });
-      }
+    const hasMore = parsedOffset + parsedLimit < totalCount;
 
-      // Get entries for this specific patient
-      entries = await findEntriesByPatientId(patientId, limitNum, offsetNum);
-      
-      // Filter by entry type if specified
-      if (entryType && typeof entryType === 'string') {
-        entries = entries.filter(entry => entry.entryType === entryType);
-      }
-      
-      // Filter by date range if specified
-      if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        
-        entries = entries.filter(entry => {
-          const entryDate = new Date(entry.occurredAt);
-          return entryDate >= start && entryDate <= end;
-        });
-      }
-      // Filter by single date if specified (for backward compatibility)
-      else if (date && typeof date === 'string') {
-        const targetDate = new Date(date);
-        const targetDateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-        
-        entries = entries.filter(entry => {
-          const entryDate = new Date(entry.occurredAt);
-          const entryDateStr = entryDate.toISOString().split('T')[0];
-          return entryDateStr === targetDateStr;
-        });
-      }
-    } else {
-      // Get all entries for all patients of the user
-      const patients = await findPatientsByUserId(actualUserId);
-      
-      for (const patient of patients) {
-        const patientEntries = await findEntriesByPatientId(patient.id, limitNum, offsetNum);
-        entries.push(...patientEntries);
-      }
-      
-      // Apply filters to all entries
-      if (entryType && typeof entryType === 'string') {
-        entries = entries.filter(entry => entry.entryType === entryType);
-      }
-      
-      // Filter by date range if specified
-      if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        
-        entries = entries.filter(entry => {
-          const entryDate = new Date(entry.occurredAt);
-          return entryDate >= start && entryDate <= end;
-        });
-      }
-      // Filter by single date if specified (for backward compatibility)
-      else if (date && typeof date === 'string') {
-        const targetDate = new Date(date);
-        const targetDateStr = targetDate.toISOString().split('T')[0];
-        
-        entries = entries.filter(entry => {
-          const entryDate = new Date(entry.occurredAt);
-          const entryDateStr = entryDate.toISOString().split('T')[0];
-          return entryDateStr === targetDateStr;
-        });
-      }
-    }
-
-    // Transform entries for response
-    const transformedEntries = entries.map(entry => ({
-      id: entry.id,
-      entryType: entry.entryType,
-      value: entry.value,
-      units: entry.units,
-      medicationBrand: entry.medicationBrand,
-      occurredAt: entry.occurredAt,
-      createdAt: entry.createdAt,
-      patientId: entry.patientId,
-    }));
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      data: transformedEntries,
+      data: entries,
+      totalCount,
+      hasMore,
     });
   } catch (error) {
     console.error('Error fetching entries:', error);
-    res.status(500).json({ error: 'Failed to fetch entries' });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
 

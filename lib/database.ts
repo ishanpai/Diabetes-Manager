@@ -4,6 +4,7 @@ import {
   eq,
   gte,
   lte,
+  sql,
 } from 'drizzle-orm';
 
 import type {
@@ -233,6 +234,19 @@ export async function findEntriesByPatientId(patientId: string, limit?: number, 
   } catch (error) {
     console.error('Error finding entries by patient ID:', error);
     return [];
+  }
+}
+
+export async function countEntriesByPatientId(patientId: string): Promise<number> {
+  try {
+    const result = await db.select({ count: sql`count(*)` })
+      .from(entries)
+      .where(eq(entries.patientId, patientId));
+    
+    return Number(result[0]?.count || 0);
+  } catch (error) {
+    console.error('Error counting entries by patient ID:', error);
+    return 0;
   }
 }
 

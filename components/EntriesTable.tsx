@@ -15,11 +15,10 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import MedicationIcon from '@mui/icons-material/Medication';
 import MonitorIcon from '@mui/icons-material/Monitor';
-import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
-import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -68,8 +67,8 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
 
       if (result.success) {
         setEntries(result.data || []);
-        setTotalEntries(result.data?.length || 0);
-        setHasMore((result.data?.length || 0) === entriesPerPage);
+        setTotalEntries(result.totalCount || 0);
+        setHasMore(result.hasMore || false);
       } else {
         throw new Error(result.error || 'Failed to fetch entries');
       }
@@ -149,7 +148,7 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Recent Entries ({totalEntries} total)
+            Recent Entries ({totalEntries < 1000 ? totalEntries : `${Math.min(totalEntries, 1000)} +`} total)
           </Typography>
           
           {entries.length > 0 ? (
@@ -222,25 +221,27 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
               {/* Pagination */}
               {totalPages > 1 && (
                 <Box display="flex" justifyContent="center" alignItems="center" gap={2} mt={2}>
-                  <IconButton
+                  <Button
+                    variant="outlined"
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 0}
                     size="small"
                   >
-                    <NavigateBeforeIcon />
-                  </IconButton>
+                    Previous
+                  </Button>
                   
                   <Typography variant="body2">
                     Page {currentPage + 1} of {totalPages}
                   </Typography>
                   
-                  <IconButton
+                  <Button
+                    variant="outlined"
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={!hasMore}
                     size="small"
                   >
-                    <NavigateNextIcon />
-                  </IconButton>
+                    Next
+                  </Button>
                 </Box>
               )}
             </>
