@@ -272,10 +272,13 @@ export function EntryForm({
             render={({ field }) => (
               <FormControl fullWidth>
                 <InputLabel>Units</InputLabel>
-                <Select {...field} label="Units">
+                <Select {...field} label="Units" disabled>
                   <MenuItem value="mg/dL">mg/dL</MenuItem>
                   <MenuItem value="mmol/L">mmol/L</MenuItem>
                 </Select>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Units are set in your <a href="/settings" style={{ color: 'inherit', textDecoration: 'underline' }}>settings</a>
+                </Typography>
               </FormControl>
             )}
           />
