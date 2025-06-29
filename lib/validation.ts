@@ -18,9 +18,9 @@ export const signupSchema = z.object({
 
 // Patient validation schemas
 export const medicationSchema = z.object({
-  brand: z.string().min(1, 'Medication brand is required'),
-  dosage: z.string().min(1, 'Dosage is required'),
-  timing: z.string().optional(),
+  brand: z.string().min(1, 'Medication brand is required').transform(val => val.trim()),
+  dosage: z.string().min(1, 'Dosage is required').transform(val => val.trim()),
+  timing: z.string().optional().transform(val => val?.trim() || ''),
 });
 
 export const patientSchema = z.object({
@@ -84,7 +84,7 @@ export const insulinEntrySchema = z.object({
     return !isNaN(num) && num >= 0 && num <= 50;
   }, 'Insulin dose must be between 0 and 50 IU'),
   units: z.literal('IU'),
-  medicationBrand: z.string().min(1, 'Medication brand is required'),
+  medicationBrand: z.string().min(1, 'Medication brand is required').transform(val => val.trim()),
   occurredAt: z.preprocess((val) => {
     if (typeof val === 'string') {
       return new Date(val);

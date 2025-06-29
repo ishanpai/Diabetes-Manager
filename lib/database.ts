@@ -387,8 +387,17 @@ export function updatePatient(id: string, patientData: Partial<Omit<Patient, 'id
     WHERE id = ?
   `);
   
-  const result = stmt.run(patientData.name, patientData.dob, patientData.diabetesType, patientData.lifestyle,
-    patientData.activityLevel, patientData.usualMedications, now, id);
+  // Convert undefined values to null for SQLite compatibility
+  const name = patientData.name ?? null;
+  const dob = patientData.dob 
+    ? (patientData.dob instanceof Date ? patientData.dob.toISOString() : new Date(patientData.dob).toISOString())
+    : null;
+  const diabetesType = patientData.diabetesType ?? null;
+  const lifestyle = patientData.lifestyle ?? null;
+  const activityLevel = patientData.activityLevel ?? null;
+  const usualMedications = patientData.usualMedications ?? null;
+  
+  const result = stmt.run(name, dob, diabetesType, lifestyle, activityLevel, usualMedications, now.toISOString(), id);
   
   if (result.changes > 0) {
     return findPatientById(id);
@@ -462,8 +471,17 @@ export function updateEntry(id: string, entryData: Partial<Omit<Entry, 'id' | 'c
     WHERE id = ?
   `);
   
-  const result = stmt.run(entryData.patientId, entryData.entryType, entryData.value, entryData.units, entryData.medicationBrand,
-    entryData.occurredAt, now, id);
+  // Convert undefined values to null for SQLite compatibility
+  const patientId = entryData.patientId ?? null;
+  const entryType = entryData.entryType ?? null;
+  const value = entryData.value ?? null;
+  const units = entryData.units ?? null;
+  const medicationBrand = entryData.medicationBrand ?? null;
+  const occurredAt = entryData.occurredAt 
+    ? (entryData.occurredAt instanceof Date ? entryData.occurredAt.toISOString() : new Date(entryData.occurredAt).toISOString())
+    : null;
+  
+  const result = stmt.run(patientId, entryType, value, units, medicationBrand, occurredAt, now.toISOString(), id);
   
   if (result.changes > 0) {
     return findEntryById(id);
@@ -543,7 +561,23 @@ export function updateRecommendation(id: string, recommendationData: Partial<Omi
     WHERE id = ?
   `);
   
-  const result = stmt.run(recommendationData.patientId, recommendationData.prompt, recommendationData.response, recommendationData.doseUnits, recommendationData.medicationName, recommendationData.reasoning, recommendationData.safetyNotes, recommendationData.confidence, recommendationData.recommendedMonitoring, recommendationData.targetTime, now, id);
+  // Convert undefined values to null for SQLite compatibility
+  const patientId = recommendationData.patientId ?? null;
+  const prompt = recommendationData.prompt ?? null;
+  const response = recommendationData.response ?? null;
+  const doseUnits = recommendationData.doseUnits ?? null;
+  const medicationName = recommendationData.medicationName ?? null;
+  const reasoning = recommendationData.reasoning ?? null;
+  const safetyNotes = recommendationData.safetyNotes ?? null;
+  const confidence = recommendationData.confidence ?? null;
+  const recommendedMonitoring = recommendationData.recommendedMonitoring ?? null;
+  const targetTime = recommendationData.targetTime
+    ? (recommendationData.targetTime instanceof Date
+        ? recommendationData.targetTime.toISOString()
+        : new Date(recommendationData.targetTime).toISOString())
+    : null;
+  
+  const result = stmt.run(patientId, prompt, response, doseUnits, medicationName, reasoning, safetyNotes, confidence, recommendedMonitoring, targetTime, now.toISOString(), id);
   
   if (result.changes > 0) {
     return findRecommendationById(id);

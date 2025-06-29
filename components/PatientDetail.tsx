@@ -17,7 +17,10 @@ import {
   PatientWithEntries,
   Recommendation,
 } from '@/types';
-import { getDiabetesTypeColor } from '@/utils/patientUtils';
+import {
+  formatPatientAge,
+  getDiabetesTypeColor,
+} from '@/utils/patientUtils';
 import { formatDate } from '@/utils/uiUtils';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -139,7 +142,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
             </Typography>
             <Box display="flex" alignItems="center" gap={2}>
               <Typography variant="body1" color="text.secondary">
-                {patientWithEntries.age} years old
+                {formatPatientAge(patientWithEntries)}
               </Typography>
               <Chip 
                 label={patientWithEntries.diabetesType} 
@@ -244,7 +247,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary">Age</Typography>
-                  <Typography variant="body1">{patientWithEntries.age} years old</Typography>
+                  <Typography variant="body1">{formatPatientAge(patientWithEntries)}</Typography>
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary">Date of Birth</Typography>

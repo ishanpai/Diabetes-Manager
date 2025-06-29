@@ -1,3 +1,4 @@
+import { calculateAge } from '@/lib/dateUtils';
 import {
   Patient,
   PatientWithStats,
@@ -31,11 +32,13 @@ export function formatPatientName(patient: Patient | PatientWithStats): string {
 }
 
 export function formatPatientAge(patient: Patient | PatientWithStats): string {
-  return `${patient.age} years old`;
+  const patientAge = patient.age || calculateAge(patient.dob);
+  return `${patientAge} years old`;
 }
 
 export function formatPatientInfo(patient: Patient | PatientWithStats): string {
-  return `${patient.age} years old • ${patient.diabetesType}`;
+  const patientAge = patient.age || calculateAge(patient.dob);
+  return `${patientAge} years old • ${patient.diabetesType}`;
 }
 
 export function getPatientActivityLevel(patient: Patient | PatientWithStats): string {
