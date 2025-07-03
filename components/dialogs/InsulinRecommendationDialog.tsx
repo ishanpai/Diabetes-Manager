@@ -4,6 +4,10 @@ import {
 } from 'react';
 
 import {
+  DOSE_DIFFERENCE_WARNING_THRESHOLD,
+  PROGRESS_STEPS,
+} from '@/lib/config';
+import {
   Recommendation,
   RecommendationProgress,
 } from '@/types';
@@ -37,13 +41,6 @@ interface InsulinRecommendationDialogProps {
   onSuccess?: (recommendation: Recommendation) => void;
   onAddEntry?: (entryType: 'insulin', defaultValues: any) => void;
 }
-
-const PROGRESS_STEPS = [
-  { key: 'gathering-data', label: 'Gathering patient data and history' },
-  { key: 'building-prompt', label: 'Building AI prompt with context' },
-  { key: 'waiting-for-model', label: 'Waiting for AI model response' },
-  { key: 'parsing-response', label: 'Processing AI recommendation' },
-];
 
 export function InsulinRecommendationDialog({
   open,
@@ -153,7 +150,7 @@ export function InsulinRecommendationDialog({
                   // Check for dose difference warning (20% threshold)
                   if (newRecommendation.doseUnits && lastDose) {
                     const difference = Math.abs(newRecommendation.doseUnits - lastDose) / lastDose;
-                    if (difference > 0.2) {
+                    if (difference > DOSE_DIFFERENCE_WARNING_THRESHOLD) {
                       setShowWarning(true);
                     }
                   }

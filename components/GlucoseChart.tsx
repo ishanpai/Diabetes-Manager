@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 
 import { useSettings } from '@/hooks/useSettings';
+import { GLUCOSE_TARGET_RANGES } from '@/lib/config';
 import { Entry } from '@/types';
 import {
   Alert,
@@ -75,21 +76,6 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
 
     setChartData(data);
   }, [entries]);
-
-  // Define target ranges based on diabetes guidelines
-  const getTargetRanges = () => {
-    const ranges = {
-      veryLow: 70, // Hypoglycemia threshold
-      low: 80,
-      targetMin: 80,
-      targetMax: 180,
-      high: 200,
-      veryHigh: 250,
-    };
-    return ranges;
-  };
-
-  const targetRanges = getTargetRanges();
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -217,25 +203,25 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
               
               {/* Target range reference lines */}
               <ReferenceLine 
-                y={targetRanges.veryLow} 
+                y={GLUCOSE_TARGET_RANGES.veryLow} 
                 stroke="#ff4444" 
                 strokeDasharray="3 3" 
                 strokeWidth={1}
               />
               <ReferenceLine 
-                y={targetRanges.targetMin} 
+                y={GLUCOSE_TARGET_RANGES.targetMin} 
                 stroke="#4caf50" 
                 strokeDasharray="3 3" 
                 strokeWidth={1}
               />
               <ReferenceLine 
-                y={targetRanges.targetMax} 
+                y={GLUCOSE_TARGET_RANGES.targetMax} 
                 stroke="#4caf50" 
                 strokeDasharray="3 3" 
                 strokeWidth={1}
               />
               <ReferenceLine 
-                y={targetRanges.veryHigh} 
+                y={GLUCOSE_TARGET_RANGES.veryHigh} 
                 stroke="#ff4444" 
                 strokeDasharray="3 3" 
                 strokeWidth={1}

@@ -5,6 +5,7 @@ import {
 import { getServerSession } from 'next-auth/next';
 import { z } from 'zod';
 
+import { GLUCOSE_TARGET_RANGES } from '@/lib/config';
 import {
   createRecommendation,
   findEntriesByPatientId,
@@ -270,6 +271,9 @@ ${medicationPatterns}
 </MEDICATION_PATTERN_ANALYSIS>
 ` : '';
 
+  const morningTargetMin = GLUCOSE_TARGET_RANGES.targetMin;
+  const morningTargetMax = GLUCOSE_TARGET_RANGES.targetMax;
+
   return `
 <TASK>
 You are a medical AI assistant specializing in diabetes management and insulin dosing recommendations. Your task is to analyze patient data and provide evidence-based insulin dose recommendations for administration at a specific target time, including which specific medication to use based on timing patterns and patient history.
@@ -292,6 +296,10 @@ Consider the following factors when making your recommendation:
    - Meal-related patterns (e.g., rapid-acting before meals, long-acting at night)
    - Consistency in medication choice for similar situations
    - The patient's usual medication schedule and preferences
+
+**For morning fasted blood sugar, the ideal target range is ${morningTargetMin}-${morningTargetMax} mg/dL.**
+
+The morning fasted blood sugar target range represents the optimal glucose level for patients after an overnight fast and before breakfast. Maintaining glucose within this range helps minimize the risk of both hypoglycemia (low blood sugar) and hyperglycemia (high blood sugar) at the start of the day. Recommendations should aim to bring or keep the patient's morning glucose within this range, unless there are specific clinical reasons to deviate. If the patient's value is outside this range, explain how your recommendation addresses this and what safety considerations apply. Always justify your dose and medication choice in the context of this target range, and highlight any risks if the recommendation may result in values outside this range.
 
 Always prioritize patient safety and be conservative in your recommendations.
 </INSTRUCTIONS>
