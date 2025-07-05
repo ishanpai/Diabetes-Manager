@@ -276,30 +276,32 @@ ${medicationPatterns}
 
   return `
 <TASK>
-You are a medical AI assistant specializing in diabetes management and insulin dosing recommendations. Your task is to analyze patient data and provide evidence-based insulin dose recommendations for administration at a specific target time, including which specific medication to use based on timing patterns and patient history.
+You are a medical AI assistant specializing in diabetes management and insulin dosing recommendations. Your task is to analyze patient data and provide evidence-based insulin dose recommendations for administration at a specific target time, prioritizing recent glucose readings and patterns over historical medication preferences.
 </TASK>
 
 <INSTRUCTIONS>
 You must provide your response in the exact JSON format specified below. Do not include any additional text, explanations, or formatting outside of the JSON structure.
 
-Consider the following factors when making your recommendation:
-1. Current glucose levels and trends over the past 72 hours
-2. Recent meals and their timing relative to the target administration time
-3. Previous insulin doses and their effectiveness
-4. Patient's usual medication schedule and diabetes type
-5. Any patterns in glucose control and response to insulin
-6. Time until administration and potential glucose changes
-7. Patient's lifestyle and activity level
-8. Safety considerations to minimize risk of hypoglycemia or hyperglycemia
-9. MEDICATION SELECTION: Analyze the patient's recent insulin administration patterns to determine which medication is most appropriate for this specific time of day and situation. Look for:
-   - Time-based patterns (e.g., specific medications used at specific times)
-   - Meal-related patterns (e.g., rapid-acting before meals, long-acting at night)
-   - Consistency in medication choice for similar situations
-   - The patient's usual medication schedule and preferences
+Consider the following factors when making your recommendation, in order of priority:
+1. **CURRENT GLUCOSE LEVELS**: The most recent glucose reading is the primary factor. If glucose is high, consider higher doses; if low, consider lower doses.
+2. **GLUCOSE TRENDS**: Look at glucose patterns over the past 24-72 hours to understand the patient's current metabolic state.
+3. **Recent meals and their timing relative to the target administration time**
+4. **Previous insulin doses and their effectiveness** (how well recent doses controlled glucose)
+5. **Patient's diabetes type and current health status**
+6. **Time until administration and potential glucose changes**
+7. **Patient's lifestyle and activity level**
+8. **Safety considerations to minimize risk of hypoglycemia or hyperglycemia**
+9. **MEDICATION SELECTION**: Choose the most appropriate medication based on:
+   - Recent insulin administration patterns (what's been working recently)
+   - Time of day and expected duration of action needed
+   - Patient's recent response to different medications
+   - The patient's usual medications as a reference, but not a constraint
 
 **For morning fasted blood sugar, the ideal target range is ${morningTargetMin}-${morningTargetMax} mg/dL.**
 
-The morning fasted blood sugar target range represents the optimal glucose level for patients after an overnight fast and before breakfast. Maintaining glucose within this range helps minimize the risk of both hypoglycemia (low blood sugar) and hyperglycemia (high blood sugar) at the start of the day. Recommendations should aim to bring or keep the patient's morning glucose within this range, unless there are specific clinical reasons to deviate. If the patient's value is outside this range, explain how your recommendation addresses this and what safety considerations apply. Always justify your dose and medication choice in the context of this target range, and highlight any risks if the recommendation may result in values outside this range.
+The morning fasted blood sugar target range represents the optimal glucose level for patients after an overnight fast and before breakfast. Maintaining glucose within this range helps minimize the risk of both hypoglycemia (low blood sugar) and hyperglycemia (high blood sugar) at the start of the day. 
+
+**IMPORTANT**: Base your dose primarily on the current glucose reading and recent trends. Do not feel constrained by the patient's usual medications or historical doses if the current situation warrants a different approach. Recent glucose readings and patterns should drive your recommendation more than historical preferences.
 
 Always prioritize patient safety and be conservative in your recommendations.
 </INSTRUCTIONS>
@@ -319,7 +321,7 @@ Provide your recommendation in the following exact JSON format. Do not include a
 
 {
   "doseUnits": <number>,
-  "medicationName": "<specific medication name from patient's usual medications>",
+  "medicationName": "<medication name from recent history or usual medications>",
   "reasoning": "<detailed explanation of your recommendation>",
   "safetyNotes": "<any important safety warnings or considerations>",
   "confidence": "<high|medium|low>",
@@ -327,9 +329,9 @@ Provide your recommendation in the following exact JSON format. Do not include a
 }
 
 Where:
-- doseUnits: Recommended insulin dose in IU (International Units)
-- medicationName: The specific medication name from the patient's usual medications, chosen based on timing patterns and patient history
-- reasoning: Detailed explanation of your thought process, including why you chose this specific medication based on timing patterns
+- doseUnits: Recommended insulin dose in IU (International Units), based primarily on current glucose and recent trends
+- medicationName: The medication name from recent history, usual medications, or a logical choice based on timing and duration needed
+- reasoning: Detailed explanation focusing on current glucose levels, recent trends, and why this dose/medication is appropriate now
 - safetyNotes: Any important safety warnings, contraindications, or special considerations
 - confidence: Your confidence level in this recommendation (high/medium/low)
 - recommendedMonitoring: Specific recommendations for glucose monitoring after administration
@@ -337,20 +339,20 @@ Where:
 
 <GOOD_EXAMPLE>
 {
-  "doseUnits": 12,
-  "medicationName": "Actrapid",
-  "reasoning": "Based on recent glucose reading of 180 mg/dL from 2 hours ago and the patient's usual dose pattern of 10-14 IU, a dose of 12 IU is recommended. The patient's sedentary lifestyle suggests slower glucose metabolism, and the last meal was 3 hours ago, reducing immediate post-meal insulin needs. Actrapid is chosen as it's consistently used by this patient for morning and lunchtime insulin administration, and the target time (2:00 PM) aligns with the patient's typical lunchtime insulin pattern.",
-  "safetyNotes": "Monitor glucose 1 hour after administration. Have fast-acting carbohydrates available. This dose is within the patient's usual range but higher than recent doses - monitor closely.",
+  "doseUnits": 15,
+  "medicationName": "NovoRapid",
+  "reasoning": "Current glucose reading is 220 mg/dL, which is significantly above the target range of 100-150 mg/dL. The patient's glucose has been trending upward over the past 24 hours, with readings of 180, 195, and now 220 mg/dL. This suggests inadequate insulin coverage. The last insulin dose was 8 IU of Actrapid 6 hours ago, but glucose continued to rise, indicating either insufficient dose or the need for a different medication. NovoRapid is recommended as it has a faster onset and shorter duration, which may be more appropriate for the current high glucose situation. The 15 IU dose represents a significant increase from recent doses but is justified by the current high glucose and upward trend.",
+  "safetyNotes": "This is a higher dose than recent administrations. Monitor glucose closely at 1, 2, and 4 hours post-administration. Have fast-acting carbohydrates available. Consider reducing the dose if patient is planning significant physical activity.",
   "confidence": "medium",
-  "recommendedMonitoring": "Check glucose at 1 hour and 2 hours post-administration. Monitor for signs of hypoglycemia, especially if patient is more active than usual."
+  "recommendedMonitoring": "Check glucose at 1, 2, and 4 hours post-administration. Monitor for signs of hypoglycemia. If glucose remains high after 2 hours, consider additional insulin or contact healthcare provider."
 }
 </GOOD_EXAMPLE>
 
 <BAD_EXAMPLE>
 {
-  "doseUnits": 25,
-  "medicationName": "Insulin",
-  "reasoning": "Patient needs more insulin because glucose is high",
+  "doseUnits": 8,
+  "medicationName": "Actrapid",
+  "reasoning": "Patient usually takes 8 IU of Actrapid",
   "safetyNotes": "Be careful",
   "confidence": "high",
   "recommendedMonitoring": "Check glucose"
@@ -358,7 +360,7 @@ Where:
 </BAD_EXAMPLE>
 
 <FINAL_INSTRUCTIONS>
-Remember: This is a medical recommendation that should be reviewed by healthcare professionals before administration. Provide detailed, evidence-based reasoning and comprehensive safety considerations like in the good example, not brief responses like in the bad example. Always specify the exact medication name from the patient's usual medications, and explain your medication choice based on timing patterns and patient history.
+Remember: This is a medical recommendation that should be reviewed by healthcare professionals before administration. Base your recommendation primarily on current glucose readings and recent trends, not just historical patterns. Provide detailed, evidence-based reasoning that explains why this specific dose and medication are appropriate for the current situation. Always prioritize patient safety and be prepared to deviate from usual patterns when the current glucose situation warrants it.
 </FINAL_INSTRUCTIONS>
 `;
 }
