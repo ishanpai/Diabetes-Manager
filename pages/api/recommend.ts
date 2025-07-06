@@ -292,10 +292,10 @@ Consider the following factors when making your recommendation, in order of prio
 7. **Patient's lifestyle and activity level**
 8. **Safety considerations to minimize risk of hypoglycemia or hyperglycemia**
 9. **MEDICATION SELECTION**: Choose the most appropriate medication based on:
-   - Recent insulin administration patterns (what's been working recently)
-   - Time of day and expected duration of action needed
-   - Patient's recent response to different medications
-   - The patient's usual medications as a reference, but not a constraint
+   - **TIME-BASED PATTERNS**: Maintain consistency with the patient's usual medication schedule for specific times of day (e.g., if they use Actrapid in the morning, continue using Actrapid in the morning)
+   - **BRAND CONSISTENCY**: Stick to the same medication brand that the patient typically uses at this time of day, unless there's a compelling clinical reason to change
+   - **DOSE FLEXIBILITY**: While keeping the same medication brand, adjust the dose based on current glucose levels and recent trends
+   - **The patient's usual medications as the primary reference for brand selection**
 
 **For morning fasted blood sugar, the ideal target range is ${morningTargetMin}-${morningTargetMax} mg/dL.**
 
@@ -340,8 +340,8 @@ Where:
 <GOOD_EXAMPLE>
 {
   "doseUnits": 15,
-  "medicationName": "NovoRapid",
-  "reasoning": "Current glucose reading is 220 mg/dL, which is significantly above the target range of 100-150 mg/dL. The patient's glucose has been trending upward over the past 24 hours, with readings of 180, 195, and now 220 mg/dL. This suggests inadequate insulin coverage. The last insulin dose was 8 IU of Actrapid 6 hours ago, but glucose continued to rise, indicating either insufficient dose or the need for a different medication. NovoRapid is recommended as it has a faster onset and shorter duration, which may be more appropriate for the current high glucose situation. The 15 IU dose represents a significant increase from recent doses but is justified by the current high glucose and upward trend.",
+  "medicationName": "Actrapid",
+  "reasoning": "Current glucose reading is 220 mg/dL, which is significantly above the target range of 100-150 mg/dL. The patient's glucose has been trending upward over the past 24 hours, with readings of 180, 195, and now 220 mg/dL. This suggests inadequate insulin coverage. The last insulin dose was 8 IU of Actrapid 6 hours ago, but glucose continued to rise. Actrapid is maintained as the medication choice since it's consistently used by this patient for morning insulin administration, maintaining brand consistency. However, the dose is increased to 15 IU (from the usual 8-10 IU range) to address the current high glucose and upward trend.",
   "safetyNotes": "This is a higher dose than recent administrations. Monitor glucose closely at 1, 2, and 4 hours post-administration. Have fast-acting carbohydrates available. Consider reducing the dose if patient is planning significant physical activity.",
   "confidence": "medium",
   "recommendedMonitoring": "Check glucose at 1, 2, and 4 hours post-administration. Monitor for signs of hypoglycemia. If glucose remains high after 2 hours, consider additional insulin or contact healthcare provider."
@@ -360,7 +360,7 @@ Where:
 </BAD_EXAMPLE>
 
 <FINAL_INSTRUCTIONS>
-Remember: This is a medical recommendation that should be reviewed by healthcare professionals before administration. Base your recommendation primarily on current glucose readings and recent trends, not just historical patterns. Provide detailed, evidence-based reasoning that explains why this specific dose and medication are appropriate for the current situation. Always prioritize patient safety and be prepared to deviate from usual patterns when the current glucose situation warrants it.
+Remember: This is a medical recommendation that should be reviewed by healthcare professionals before administration. Base your dose recommendation primarily on current glucose readings and recent trends, but maintain consistency with the patient's usual medication brand for the specific time of day. Provide detailed, evidence-based reasoning that explains why this specific dose is appropriate for the current situation while maintaining the patient's established medication routine. Always prioritize patient safety and be prepared to adjust doses when the current glucose situation warrants it, but keep the same medication brand unless there's a compelling clinical reason to change.
 </FINAL_INSTRUCTIONS>
 `;
 }
