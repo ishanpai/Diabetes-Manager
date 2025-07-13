@@ -252,13 +252,36 @@ Target Administration Time: ${formatLocalTime(targetTime, timeZone)}
 </TARGET_TIME>
 `;
 
+  // Sort entries by occurredAt in descending order (newest first) for better AI comprehension
+  const sortedEntries = [...entries].sort((a, b) => 
+    new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+  );
+
+  // Separate entries into most recent (last 24 hours) and older (24-72 hours)
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  const mostRecentEntries = sortedEntries.filter(entry => 
+    new Date(entry.occurredAt) >= twentyFourHoursAgo
+  );
+  
+  const olderEntries = sortedEntries.filter(entry => 
+    new Date(entry.occurredAt) < twentyFourHoursAgo
+  );
+
   const recentHistory = entries.length > 0 
     ? `<RECENT_HISTORY>
-Recent History (Last 72 hours):
-${entries.map(entry => `<${entry.entryType.toUpperCase()}>
+${mostRecentEntries.length > 0 ? `MOST RECENT ENTRIES (Last 24 hours):
+${mostRecentEntries.map(entry => `<${entry.entryType.toUpperCase()}>
     <VALUE>${entry.value}${entry.units ? ` ${entry.units}` : ''} ${entry.medicationBrand ? `(${entry.medicationBrand})` : ''}</VALUE>
     <OCCURRED_AT>${formatLocalTime(new Date(entry.occurredAt), timeZone)}</OCCURRED_AT>
-    </${entry.entryType.toUpperCase()}>`).join('\n')}
+    </${entry.entryType.toUpperCase()}>`).join('\n')}` : 'No entries in the last 24 hours.'}
+
+${olderEntries.length > 0 ? `OLDER ENTRIES (24-72 hours ago):
+${olderEntries.map(entry => `<${entry.entryType.toUpperCase()}>
+    <VALUE>${entry.value}${entry.units ? ` ${entry.units}` : ''} ${entry.medicationBrand ? `(${entry.medicationBrand})` : ''}</VALUE>
+    <OCCURRED_AT>${formatLocalTime(new Date(entry.occurredAt), timeZone)}</OCCURRED_AT>
+    </${entry.entryType.toUpperCase()}>`).join('\n')}` : ''}
 </RECENT_HISTORY>`
     : `<RECENT_HISTORY>
 No recent entries in the last 72 hours.
@@ -302,6 +325,8 @@ Consider the following factors when making your recommendation, in order of prio
 The morning fasted blood sugar target range represents the optimal glucose level for patients after an overnight fast and before breakfast. Maintaining glucose within this range helps minimize the risk of both hypoglycemia (low blood sugar) and hyperglycemia (high blood sugar) at the start of the day. 
 
 **IMPORTANT**: Base your dose primarily on the current glucose reading and recent trends. Do not feel constrained by the patient's usual medications or historical doses if the current situation warrants a different approach. Recent glucose readings and patterns should drive your recommendation more than historical preferences.
+
+**NOTE**: The recent history is divided into two sections: "MOST RECENT ENTRIES" (last 24 hours) and "OLDER ENTRIES" (24-72 hours ago). The most recent insulin dose will be the first insulin entry in the "MOST RECENT ENTRIES" section. Pay special attention to the most recent entries as they are most relevant for current dosing decisions.
 
 Always prioritize patient safety and be conservative in your recommendations.
 </INSTRUCTIONS>
