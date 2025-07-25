@@ -326,6 +326,8 @@ The morning fasted blood sugar target range represents the optimal glucose level
 
 **IMPORTANT**: Base your dose primarily on the current glucose reading and recent trends. Do not feel constrained by the patient's usual medications or historical doses if the current situation warrants a different approach. Recent glucose readings and patterns should drive your recommendation more than historical preferences.
 
+**IMPORTANT CLINICAL RULE**: Only use a glucose reading as the primary basis for insulin dosing if it was measured after the most recent insulin dose. If the most recent glucose reading is from before the last insulin administration, it is outdated and should not be used as the main basis for the current recommendation. In such cases, base your recommendation on recent trends, usual doses, and safety, and clearly state that a new glucose reading is needed for optimal dosing. Meals do not invalidate a glucose reading for dosing purposes.
+
 **NOTE**: The recent history is divided into two sections: "MOST RECENT ENTRIES" (last 24 hours) and "OLDER ENTRIES" (24-72 hours ago). The most recent insulin dose will be the first insulin entry in the "MOST RECENT ENTRIES" section. Pay special attention to the most recent entries as they are most relevant for current dosing decisions.
 
 Always prioritize patient safety and be conservative in your recommendations.
@@ -381,6 +383,14 @@ Where:
   "safetyNotes": "Be careful",
   "confidence": "high",
   "recommendedMonitoring": "Check glucose"
+}
+{
+  "doseUnits": 12,
+  "medicationName": "Actrapid",
+  "reasoning": "The patient's glucose was 181 mg/dL at 7:00 AM, so a higher dose is recommended after lunch.",
+  "safetyNotes": "Monitor for hypoglycemia.",
+  "confidence": "medium",
+  "recommendedMonitoring": "Check glucose after 2 hours."
 }
 </BAD_EXAMPLE>
 
