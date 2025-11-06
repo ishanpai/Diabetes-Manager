@@ -4,9 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 import { AddEntryDialog } from '@/components/dialogs/AddEntryDialog';
-import {
-  InsulinRecommendationDialog,
-} from '@/components/dialogs/InsulinRecommendationDialog';
+import { InsulinRecommendationDialog } from '@/components/dialogs/InsulinRecommendationDialog';
 import { EntriesTable } from '@/components/EntriesTable';
 import { GlucoseChart } from '@/components/GlucoseChart';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -14,10 +12,7 @@ import { ErrorDisplay } from '@/components/ui/ErrorDisplay';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePatient } from '@/hooks/usePatient';
 import type { EntryFormValues } from '@/components/EntryForm';
-import {
-  Entry,
-  Recommendation,
-} from '@/types';
+import { Entry, Recommendation } from '@/types';
 import {
   formatPatientAge,
   getDiabetesTypeColor,
@@ -32,16 +27,7 @@ import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import MedicationIcon from '@mui/icons-material/Medication';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Container,
-  Grid,
-  Typography,
-} from '@mui/material';
+import { Box, Button, Card, CardContent, Chip, Container, Grid, Typography } from '@mui/material';
 
 interface PatientDetailProps {
   patientId: string;
@@ -49,7 +35,11 @@ interface PatientDetailProps {
   showActions?: boolean;
 }
 
-export function PatientDetail({ patientId, showHeader = true, showActions = true }: PatientDetailProps) {
+export function PatientDetail({
+  patientId,
+  showHeader = true,
+  showActions = true,
+}: PatientDetailProps) {
   const { patient, loading, error, refetch } = usePatient(patientId);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [entriesLoading, setEntriesLoading] = useState(true);
@@ -58,7 +48,9 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
   // Dialog state
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [entryType, setEntryType] = useState<'glucose' | 'meal' | 'insulin'>('glucose');
-  const [entryDefaultValues, setEntryDefaultValues] = useState<Partial<EntryFormValues> | undefined>(undefined);
+  const [entryDefaultValues, setEntryDefaultValues] = useState<
+    Partial<EntryFormValues> | undefined
+  >(undefined);
   const [recommendationDialogOpen, setRecommendationDialogOpen] = useState(false);
 
   // Fetch entries for the patient
@@ -144,7 +136,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
     defaultValues: Partial<EntryFormValues>,
   ) => {
     if (!patient) {
-      alert("Patient not found");
+      alert('Patient not found');
       return;
     }
 
@@ -152,7 +144,11 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
 
     // If no medication brand is provided, use the first available insulin medication
     const finalDefaultValues: Partial<EntryFormValues> = { ...defaultValues };
-    if (entryType === 'insulin' && !defaultValues.medicationBrand && patient.usualMedications?.length > 0) {
+    if (
+      entryType === 'insulin' &&
+      !defaultValues.medicationBrand &&
+      patient.usualMedications?.length > 0
+    ) {
       // Find the first insulin medication (assuming all medications in the list are insulin)
       const firstMedication = patient.usualMedications[0];
       finalDefaultValues.medicationBrand = firstMedication.brand;
@@ -177,7 +173,12 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
   }
 
   if (!patient) {
-    return <EmptyState title="Patient not found" description="The patient you're looking for doesn't exist." />;
+    return (
+      <EmptyState
+        title="Patient not found"
+        description="The patient you're looking for doesn't exist."
+      />
+    );
   }
 
   const historyRequirementStatus = getHistoryRequirementStatus(entries);
@@ -208,7 +209,12 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
                   Edit Patient
                 </Button>
               </Link>
-              <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDeletePatient}>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={handleDeletePatient}
+              >
                 Delete Patient
               </Button>
             </Box>
@@ -284,10 +290,10 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
         <Card variant="outlined" sx={{ mb: 3 }}>
           <CardContent>
             <Box display="flex" alignItems="center" gap={2} mb={1}>
-              <InfoIcon color={historyRequirementStatus.hasSufficientHistory ? "success" : "warning"} />
-              <Typography variant="h6">
-                Not enough history for recommendations
-              </Typography>
+              <InfoIcon
+                color={historyRequirementStatus.hasSufficientHistory ? 'success' : 'warning'}
+              />
+              <Typography variant="h6">Not enough history for recommendations</Typography>
             </Box>
             <Box mt={2} p={2} bgcolor="grey.50" borderRadius={1}>
               <Typography variant="body2" fontWeight={600} gutterBottom>
@@ -328,30 +334,46 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
               </Typography>
               <Box display="flex" flexDirection="column" gap={2}>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Name</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Name
+                  </Typography>
                   <Typography variant="body1">{patient.name}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Age</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Age
+                  </Typography>
                   <Typography variant="body1">{formatPatientAge(patient)}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Date of Birth</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Date of Birth
+                  </Typography>
                   <Typography variant="body1">{formatDate(patient.dob)}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Diabetes Type</Typography>
-                  <Chip label={patient.diabetesType} color={getDiabetesTypeColor(patient.diabetesType)} size="small" />
+                  <Typography variant="body2" color="text.secondary">
+                    Diabetes Type
+                  </Typography>
+                  <Chip
+                    label={patient.diabetesType}
+                    color={getDiabetesTypeColor(patient.diabetesType)}
+                    size="small"
+                  />
                 </Box>
                 {patient.lifestyle && (
                   <Box>
-                    <Typography variant="body2" color="text.secondary">Lifestyle</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Lifestyle
+                    </Typography>
                     <Typography variant="body1">{patient.lifestyle}</Typography>
                   </Box>
                 )}
                 {patient.activityLevel && (
                   <Box>
-                    <Typography variant="body2" color="text.secondary">Activity Level</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Activity Level
+                    </Typography>
                     <Typography variant="body1">{patient.activityLevel}</Typography>
                   </Box>
                 )}
@@ -390,11 +412,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
         {/* Glucose Chart - Full Width Below */}
         <Grid item xs={12}>
           <Box mt={2}>
-            <GlucoseChart
-              entries={entries}
-              loading={entriesLoading}
-              error={null}
-            />
+            <GlucoseChart entries={entries} loading={entriesLoading} error={null} />
           </Box>
         </Grid>
       </Grid>
@@ -420,4 +438,4 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
       />
     </Container>
   );
-} 
+}

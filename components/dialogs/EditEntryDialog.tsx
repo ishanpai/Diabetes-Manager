@@ -1,23 +1,10 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
-import {
-  EntryForm,
-  EntryFormValues,
-} from '@/components/EntryForm';
+import { EntryForm, EntryFormValues } from '@/components/EntryForm';
 import { useSettings } from '@/hooks/useSettings';
 import { logger } from '@/lib/logger';
-import {
-  Entry,
-  Medication,
-} from '@/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@mui/material';
+import { Entry, Medication } from '@/types';
+import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 
 interface EditEntryDialogProps {
   open: boolean;
@@ -46,16 +33,17 @@ export function EditEntryDialog({
         value: entry.value,
         units: entry.units || '',
         medicationBrand: entry.medicationBrand || '',
-        occurredAt: entry.occurredAt instanceof Date 
-          ? entry.occurredAt 
-          : new Date(entry.occurredAt),
+        occurredAt:
+          entry.occurredAt instanceof Date ? entry.occurredAt : new Date(entry.occurredAt),
       });
       setError(null);
     }
   }, [entry]);
 
   const handleSubmit = async (data: EntryFormValues) => {
-    if (!entry) {return;}
+    if (!entry) {
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -100,7 +88,10 @@ export function EditEntryDialog({
   };
 
   const handleDelete = async () => {
-    if (!entry || !confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
+    if (
+      !entry ||
+      !confirm('Are you sure you want to delete this entry? This action cannot be undone.')
+    ) {
       return;
     }
 
@@ -132,15 +123,12 @@ export function EditEntryDialog({
     onClose();
   };
 
-  if (!entry) {return null;}
+  if (!entry) {
+    return null;
+  }
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={handleClose}
-      maxWidth="sm"
-      fullWidth
-    >
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         Edit {entry.entryType.charAt(0).toUpperCase() + entry.entryType.slice(1)} Entry
       </DialogTitle>
@@ -162,4 +150,4 @@ export function EditEntryDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}

@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
 import { useRouter } from 'next/router';
 
@@ -15,7 +12,7 @@ export default function EditPatient() {
   const { isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { id } = router.query;
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patient, setPatient] = useState<PatientWithEntries | null>(null);
@@ -65,7 +62,9 @@ export default function EditPatient() {
   }
 
   const handleSubmit = async (formData: PatientFormSubmitData) => {
-    if (!id || typeof id !== 'string') {return;}
+    if (!id || typeof id !== 'string') {
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -125,4 +124,4 @@ export default function EditPatient() {
       submitButtonText="Update Patient"
     />
   );
-} 
+}

@@ -1,7 +1,4 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
 import {
@@ -41,7 +38,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-async function getEntry(req: NextApiRequest, res: NextApiResponse, userId: string, entryId: string) {
+async function getEntry(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  entryId: string,
+) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
@@ -86,7 +88,12 @@ async function getEntry(req: NextApiRequest, res: NextApiResponse, userId: strin
   }
 }
 
-async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, userId: string, entryId: string) {
+async function updateEntryHandler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  entryId: string,
+) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
@@ -134,9 +141,10 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     const validatedData = updateEntrySchema.parse(req.body);
 
     // Convert occurredAt to Date if it's a string
-    const occurredAt = validatedData.occurredAt instanceof Date 
-      ? validatedData.occurredAt 
-      : new Date(validatedData.occurredAt);
+    const occurredAt =
+      validatedData.occurredAt instanceof Date
+        ? validatedData.occurredAt
+        : new Date(validatedData.occurredAt);
 
     // Prepare update data
     const updateData: Parameters<typeof updateEntry>[1] = {
@@ -185,7 +193,12 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
   }
 }
 
-async function deleteEntryHandler(req: NextApiRequest, res: NextApiResponse, userId: string, entryId: string) {
+async function deleteEntryHandler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  entryId: string,
+) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;

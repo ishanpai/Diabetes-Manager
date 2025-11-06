@@ -1,7 +1,4 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
 import {
@@ -47,48 +44,54 @@ async function getPatients(res: NextApiResponse, userId: string) {
     const patients = await findPatientsByUserId(actualUserId);
 
     // Transform for response with additional stats
-    const transformedPatients = await Promise.all(patients.map(async patient => {
-      // Get recent entries for stats
-      const patientEntries = await findEntriesByPatientId(patient.id, 10, 0);
-      const glucoseEntries = patientEntries.filter(entry => entry.entryType === 'glucose');
-      const lastGlucoseEntry = glucoseEntries[0]; // Most recent first
-      
-      // Calculate age
-      const age = Math.floor((new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-      
-      // Parse medications
-      let medications: Medication[] = [];
-      try {
-        if (typeof patient.usualMedications === 'string') {
-          medications = JSON.parse(patient.usualMedications) as Medication[];
-        } else {
-          medications = patient.usualMedications || [];
-        }
-      } catch (error) {
-        logger.error('Error parsing patient medications:', error);
-        medications = [];
-      }
+    const transformedPatients = await Promise.all(
+      patients.map(async (patient) => {
+        // Get recent entries for stats
+        const patientEntries = await findEntriesByPatientId(patient.id, 10, 0);
+        const glucoseEntries = patientEntries.filter((entry) => entry.entryType === 'glucose');
+        const lastGlucoseEntry = glucoseEntries[0]; // Most recent first
 
-      return {
-        id: patient.id,
-        name: patient.name,
-        dob: patient.dob,
-        diabetesType: patient.diabetesType,
-        lifestyle: patient.lifestyle,
-        activityLevel: patient.activityLevel,
-        usualMedications: medications,
-        createdAt: patient.createdAt,
-        updatedAt: patient.updatedAt,
-        age,
-        lastGlucoseReading: lastGlucoseEntry ? {
-          value: parseInt(lastGlucoseEntry.value),
-          occurredAt: lastGlucoseEntry.occurredAt,
-          status: getGlucoseStatus(parseInt(lastGlucoseEntry.value)),
-        } : undefined,
-        recentEntries: patientEntries.length,
-        lastEntryDate: patientEntries[0]?.occurredAt,
-      };
-    }));
+        // Calculate age
+        const age = Math.floor(
+          (new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+        );
+
+        // Parse medications
+        let medications: Medication[] = [];
+        try {
+          if (typeof patient.usualMedications === 'string') {
+            medications = JSON.parse(patient.usualMedications) as Medication[];
+          } else {
+            medications = patient.usualMedications || [];
+          }
+        } catch (error) {
+          logger.error('Error parsing patient medications:', error);
+          medications = [];
+        }
+
+        return {
+          id: patient.id,
+          name: patient.name,
+          dob: patient.dob,
+          diabetesType: patient.diabetesType,
+          lifestyle: patient.lifestyle,
+          activityLevel: patient.activityLevel,
+          usualMedications: medications,
+          createdAt: patient.createdAt,
+          updatedAt: patient.updatedAt,
+          age,
+          lastGlucoseReading: lastGlucoseEntry
+            ? {
+                value: parseInt(lastGlucoseEntry.value),
+                occurredAt: lastGlucoseEntry.occurredAt,
+                status: getGlucoseStatus(parseInt(lastGlucoseEntry.value)),
+              }
+            : undefined,
+          recentEntries: patientEntries.length,
+          lastEntryDate: patientEntries[0]?.occurredAt,
+        };
+      }),
+    );
 
     res.status(200).json({
       success: true,
@@ -128,9 +131,7 @@ async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, u
     const validatedData = createPatientSchema.parse(req.body);
 
     // Convert dates if they're strings
-    const dob = validatedData.dob instanceof Date 
-      ? validatedData.dob 
-      : new Date(validatedData.dob);
+    const dob = validatedData.dob instanceof Date ? validatedData.dob : new Date(validatedData.dob);
 
     let parsedMedications: Medication[] = [];
     try {
@@ -186,7 +187,11 @@ async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, u
 }
 
 function getGlucoseStatus(value: number): 'low' | 'normal' | 'high' {
-  if (value < 70) {return 'low';}
-  if (value > 180) {return 'high';}
+  if (value < 70) {
+    return 'low';
+  }
+  if (value > 180) {
+    return 'high';
+  }
   return 'normal';
-} 
+}

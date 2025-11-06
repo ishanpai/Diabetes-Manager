@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { EditEntryDialog } from '@/components/dialogs/EditEntryDialog';
-import {
-  Entry,
-  Medication,
-} from '@/types';
-import {
-  formatDateTime,
-  getEntryTypeColor,
-} from '@/utils/uiUtils';
+import { Entry, Medication } from '@/types';
+import { formatDateTime, getEntryTypeColor } from '@/utils/uiUtils';
 import { logger } from '@/lib/logger';
 import EditIcon from '@mui/icons-material/Edit';
 import MedicationIcon from '@mui/icons-material/Medication';
@@ -49,34 +43,37 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
 
   const entriesPerPage = 10;
 
-  const fetchEntries = useCallback(async (page: number = 0) => {
-    setLoading(true);
-    setError(null);
+  const fetchEntries = useCallback(
+    async (page: number = 0) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const response = await fetch(
-        `/api/entries?patientId=${patientId}&limit=${entriesPerPage}&offset=${page * entriesPerPage}`
-      );
-      const result = await response.json();
+      try {
+        const response = await fetch(
+          `/api/entries?patientId=${patientId}&limit=${entriesPerPage}&offset=${page * entriesPerPage}`,
+        );
+        const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to fetch entries');
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to fetch entries');
+        }
+
+        if (result.success) {
+          setEntries(result.data || []);
+          setTotalEntries(result.totalCount || 0);
+          setHasMore(result.hasMore || false);
+        } else {
+          throw new Error(result.error || 'Failed to fetch entries');
+        }
+      } catch (err) {
+        logger.error('Error fetching entries:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
       }
-
-      if (result.success) {
-        setEntries(result.data || []);
-        setTotalEntries(result.totalCount || 0);
-        setHasMore(result.hasMore || false);
-      } else {
-        throw new Error(result.error || 'Failed to fetch entries');
-      }
-    } catch (err) {
-      logger.error('Error fetching entries:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, [patientId]);
+    },
+    [patientId],
+  );
 
   useEffect(() => {
     void fetchEntries(currentPage);
@@ -90,17 +87,15 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
   const handleEntryUpdate = (updatedEntry: Entry) => {
     // If entry was deleted (value is 'DELETED'), remove it from the list
     if (updatedEntry.value === 'DELETED') {
-      setEntries(prev => prev.filter(entry => entry.id !== updatedEntry.id));
-      setTotalEntries(prev => prev - 1);
+      setEntries((prev) => prev.filter((entry) => entry.id !== updatedEntry.id));
+      setTotalEntries((prev) => prev - 1);
     } else {
       // Update the entry in the list
-      setEntries(prev => 
-        prev.map(entry => 
-          entry.id === updatedEntry.id ? updatedEntry : entry
-        )
+      setEntries((prev) =>
+        prev.map((entry) => (entry.id === updatedEntry.id ? updatedEntry : entry)),
       );
     }
-    
+
     // Notify parent component to refresh data
     onEntryUpdate();
   };
@@ -146,9 +141,10 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Recent Entries ({totalEntries < 1000 ? totalEntries : `${Math.min(totalEntries, 1000)} +`} total)
+            Recent Entries (
+            {totalEntries < 1000 ? totalEntries : `${Math.min(totalEntries, 1000)} +`} total)
           </Typography>
-          
+
           {entries.length > 0 ? (
             <>
               <TableContainer component={Paper} variant="outlined">
@@ -165,14 +161,18 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
                     {entries.map((entry: Entry) => (
                       <TableRow key={entry.id}>
                         <TableCell>
-                          <Chip 
-                            label={entry.entryType} 
+                          <Chip
+                            label={entry.entryType}
                             color={getEntryTypeColor(entry.entryType)}
                             size="small"
                             icon={
-                              entry.entryType === 'glucose' ? <MonitorIcon /> :
-                              entry.entryType === 'meal' ? <RestaurantIcon /> :
-                              entry.entryType === 'insulin' ? <MedicationIcon /> : undefined
+                              entry.entryType === 'glucose' ? (
+                                <MonitorIcon />
+                              ) : entry.entryType === 'meal' ? (
+                                <RestaurantIcon />
+                              ) : entry.entryType === 'insulin' ? (
+                                <MedicationIcon />
+                              ) : undefined
                             }
                           />
                         </TableCell>
@@ -195,9 +195,7 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
                             </Box>
                           )}
                           {entry.entryType === 'meal' && (
-                            <Typography variant="body2">
-                              {entry.value}
-                            </Typography>
+                            <Typography variant="body2">{entry.value}</Typography>
                           )}
                         </TableCell>
                         <TableCell>{formatDateTime(entry.occurredAt)}</TableCell>
@@ -227,11 +225,11 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
                   >
                     Previous
                   </Button>
-                  
+
                   <Typography variant="body2">
                     Page {currentPage + 1} of {totalPages}
                   </Typography>
-                  
+
                   <Button
                     variant="outlined"
                     onClick={() => handlePageChange(currentPage + 1)}
@@ -264,4 +262,4 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
       />
     </>
   );
-} 
+}

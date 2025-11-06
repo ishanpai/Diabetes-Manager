@@ -1,15 +1,7 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
-import {
-  deletePatient,
-  findPatientById,
-  findUserByEmail,
-  updatePatient,
-} from '@/lib/database';
+import { deletePatient, findPatientById, findUserByEmail, updatePatient } from '@/lib/database';
 import type { Medication } from '@/types';
 import { logger } from '@/lib/logger';
 import { getSessionUserId } from '@/lib/utils/session';
@@ -72,7 +64,12 @@ async function getPatient(res: NextApiResponse, userId: string, patientId: strin
   }
 }
 
-async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
+async function updatePatientHandler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  patientId: string,
+) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
@@ -119,9 +116,8 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
     }
 
     if (validatedData.dob !== undefined) {
-      updateData.dob = validatedData.dob instanceof Date 
-        ? validatedData.dob 
-        : new Date(validatedData.dob);
+      updateData.dob =
+        validatedData.dob instanceof Date ? validatedData.dob : new Date(validatedData.dob);
     }
 
     if (validatedData.diabetesType !== undefined) {
@@ -138,7 +134,9 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
 
     if (validatedData.usualMedications !== undefined) {
       try {
-        updateData.usualMedications = JSON.parse(validatedData.usualMedications || '[]') as Medication[];
+        updateData.usualMedications = JSON.parse(
+          validatedData.usualMedications || '[]',
+        ) as Medication[];
       } catch (error) {
         logger.error('Error parsing medications payload:', error);
         return res.status(400).json({ error: 'Invalid medications format' });
@@ -150,7 +148,6 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
     if (!updatedPatient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
-
 
     res.status(200).json({
       success: true,
@@ -168,7 +165,12 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
   }
 }
 
-async function deletePatientHandler(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
+async function deletePatientHandler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  patientId: string,
+) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;

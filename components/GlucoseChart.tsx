@@ -1,7 +1,4 @@
-import React, {
-  useEffect,
-  useState,
-} from 'react';
+import React, { useEffect, useState } from 'react';
 
 import {
   CartesianGrid,
@@ -14,23 +11,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type {
-  NameType,
-  ValueType,
-} from 'recharts/types/component/DefaultTooltipContent';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 
 import { useSettings } from '@/hooks/useSettings';
 import { GLUCOSE_TARGET_RANGES } from '@/lib/config';
 import { Entry } from '@/types';
-import {
-  Alert,
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Card, CardContent, Chip, CircularProgress, Typography } from '@mui/material';
 
 interface GlucoseChartProps {
   entries?: Entry[];
@@ -54,19 +40,19 @@ export function GlucoseChart({ entries = [], loading = false, error = null }: Gl
 
   // Filter glucose entries and convert to chart data
   useEffect(() => {
-    const glucoseOnly = entries.filter(entry => entry.entryType === 'glucose');
+    const glucoseOnly = entries.filter((entry) => entry.entryType === 'glucose');
     setGlucoseEntries(glucoseOnly);
 
     const data: ChartDataPoint[] = glucoseOnly
-      .map(entry => {
+      .map((entry) => {
         const date = new Date(entry.occurredAt);
         let glucoseValue = parseFloat(entry.value);
-        
+
         // Convert mmol/L to mg/dL if needed for consistent display
         if (entry.units === 'mmol/L') {
           glucoseValue = glucoseValue * 18; // Convert to mg/dL for chart
         }
-        
+
         return {
           timestamp: new Date(entry.occurredAt).toISOString(),
           timestampMs: new Date(entry.occurredAt).getTime(),
@@ -93,9 +79,10 @@ export function GlucoseChart({ entries = [], loading = false, error = null }: Gl
     }
 
     const originalValue = data.glucose;
-    const displayValue = settings?.glucoseUnits === 'mmol/L'
-      ? (originalValue / 18).toFixed(1)
-      : Math.round(originalValue);
+    const displayValue =
+      settings?.glucoseUnits === 'mmol/L'
+        ? (originalValue / 18).toFixed(1)
+        : Math.round(originalValue);
     const d = new Date(data.timestampMs);
     const dateLabel = `${formatDate(d)} at ${formatTime(d)}`;
 
@@ -120,10 +107,13 @@ export function GlucoseChart({ entries = [], loading = false, error = null }: Gl
   };
 
   // Determine if readings span multiple days and how many
-  const uniqueDates = Array.from(new Set(chartData.map(d => d.date)));
+  const uniqueDates = Array.from(new Set(chartData.map((d) => d.date)));
   let xAxisMode: 'time' | 'datetime' | 'date' = 'time';
-  if (uniqueDates.length > 5) {xAxisMode = 'date';}
-  else if (uniqueDates.length > 1) {xAxisMode = 'datetime';}
+  if (uniqueDates.length > 5) {
+    xAxisMode = 'date';
+  } else if (uniqueDates.length > 1) {
+    xAxisMode = 'datetime';
+  }
 
   // Helper for formatting
   function formatDate(d: Date) {
@@ -134,7 +124,7 @@ export function GlucoseChart({ entries = [], loading = false, error = null }: Gl
   }
 
   // Calculate Y-axis range based on data
-  const glucoseValues = chartData.map(d => d.glucose);
+  const glucoseValues = chartData.map((d) => d.glucose);
   let yMin = Math.min(...glucoseValues, 70);
   let yMax = Math.max(...glucoseValues, 180);
   if (glucoseValues.length > 0) {
@@ -187,21 +177,19 @@ export function GlucoseChart({ entries = [], loading = false, error = null }: Gl
     <Card>
       <CardContent>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">
-            Glucose Chart
-          </Typography>
+          <Typography variant="h6">Glucose Chart</Typography>
           <Box display="flex" gap={1}>
-            <Chip 
-              label={`${glucoseEntries.length} readings`} 
-              size="small" 
-              color="primary" 
-              variant="outlined" 
+            <Chip
+              label={`${glucoseEntries.length} readings`}
+              size="small"
+              color="primary"
+              variant="outlined"
             />
-            <Chip 
-              label={settings?.glucoseUnits || 'mg/dL'} 
-              size="small" 
-              color="secondary" 
-              variant="outlined" 
+            <Chip
+              label={settings?.glucoseUnits || 'mg/dL'}
+              size="small"
+              color="secondary"
+              variant="outlined"
             />
           </Box>
         </Box>
@@ -210,62 +198,66 @@ export function GlucoseChart({ entries = [], loading = false, error = null }: Gl
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              
+
               {/* Target range reference lines */}
-              <ReferenceLine 
-                y={GLUCOSE_TARGET_RANGES.veryLow} 
-                stroke="#ff4444" 
-                strokeDasharray="3 3" 
+              <ReferenceLine
+                y={GLUCOSE_TARGET_RANGES.veryLow}
+                stroke="#ff4444"
+                strokeDasharray="3 3"
                 strokeWidth={1}
               />
-              <ReferenceLine 
-                y={GLUCOSE_TARGET_RANGES.targetMin} 
-                stroke="#4caf50" 
-                strokeDasharray="3 3" 
+              <ReferenceLine
+                y={GLUCOSE_TARGET_RANGES.targetMin}
+                stroke="#4caf50"
+                strokeDasharray="3 3"
                 strokeWidth={1}
               />
-              <ReferenceLine 
-                y={GLUCOSE_TARGET_RANGES.targetMax} 
-                stroke="#4caf50" 
-                strokeDasharray="3 3" 
+              <ReferenceLine
+                y={GLUCOSE_TARGET_RANGES.targetMax}
+                stroke="#4caf50"
+                strokeDasharray="3 3"
                 strokeWidth={1}
               />
-              <ReferenceLine 
-                y={GLUCOSE_TARGET_RANGES.veryHigh} 
-                stroke="#ff4444" 
-                strokeDasharray="3 3" 
+              <ReferenceLine
+                y={GLUCOSE_TARGET_RANGES.veryHigh}
+                stroke="#ff4444"
+                strokeDasharray="3 3"
                 strokeWidth={1}
               />
-              
-              <XAxis 
+
+              <XAxis
                 type="number"
-                dataKey="timestampMs" 
+                dataKey="timestampMs"
                 domain={['auto', 'auto']}
                 tick={{ fontSize: 12 }}
                 interval="preserveStartEnd"
                 minTickGap={30}
                 tickFormatter={(value: number) => {
                   const d = new Date(value);
-                  if (xAxisMode === 'date') {return formatDate(d);}
-                  if (xAxisMode === 'datetime') {return `${formatDate(d)} ${formatTime(d)}`;}
+                  if (xAxisMode === 'date') {
+                    return formatDate(d);
+                  }
+                  if (xAxisMode === 'datetime') {
+                    return `${formatDate(d)} ${formatTime(d)}`;
+                  }
                   return formatTime(d);
                 }}
               />
-              <YAxis 
+              <YAxis
                 domain={[yMin, yMax]}
                 tick={{ fontSize: 12 }}
-                label={{ 
-                  value: `Glucose (${settings?.glucoseUnits || 'mg/dL'})`, 
-                  angle: -90, 
+                label={{
+                  value: `Glucose (${settings?.glucoseUnits || 'mg/dL'})`,
+                  angle: -90,
                   position: 'insideLeft',
-                  style: { textAnchor: 'middle' }
+                  style: { textAnchor: 'middle' },
                 }}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Line 
-                type="monotone" 
-                dataKey="glucose" 
-                stroke="#2196f3" 
+              <Line
+                type="monotone"
+                dataKey="glucose"
+                stroke="#2196f3"
                 strokeWidth={2}
                 dot={{ fill: '#2196f3', strokeWidth: 2, r: 4 }}
                 activeDot={{ r: 6, stroke: '#2196f3', strokeWidth: 2 }}
@@ -292,4 +284,4 @@ export function GlucoseChart({ entries = [], loading = false, error = null }: Gl
       </CardContent>
     </Card>
   );
-} 
+}

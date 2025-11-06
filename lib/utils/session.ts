@@ -1,8 +1,5 @@
 import { getServerSession } from 'next-auth/next';
-import type {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
 type AuthConfig = Exclude<Parameters<typeof getServerSession>[2], undefined>;
 

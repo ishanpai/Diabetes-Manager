@@ -1,7 +1,4 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
 import {
@@ -49,18 +46,32 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse) {
     let totalCount = 0;
 
     // If filtering by entry type, use the filtered function
-    if (entryType && typeof entryType === 'string' && ['glucose', 'meal', 'insulin'].includes(entryType)) {
-      entries = await findEntriesByPatientIdAndType(patientId, entryType as 'glucose' | 'meal' | 'insulin', parsedLimit, parsedOffset);
-      
+    if (
+      entryType &&
+      typeof entryType === 'string' &&
+      ['glucose', 'meal', 'insulin'].includes(entryType)
+    ) {
+      entries = await findEntriesByPatientIdAndType(
+        patientId,
+        entryType as 'glucose' | 'meal' | 'insulin',
+        parsedLimit,
+        parsedOffset,
+      );
+
       // For now, we'll get all entries of this type and count them
       // In a production app, you'd want a separate count function for filtered results
-      const allEntriesOfType = await findEntriesByPatientIdAndType(patientId, entryType as 'glucose' | 'meal' | 'insulin', 10000, 0);
+      const allEntriesOfType = await findEntriesByPatientIdAndType(
+        patientId,
+        entryType as 'glucose' | 'meal' | 'insulin',
+        10000,
+        0,
+      );
       totalCount = allEntriesOfType.length;
     } else {
       // Get total count and entries in parallel for unfiltered results
       [totalCount, entries] = await Promise.all([
         countEntriesByPatientId(patientId),
-        findEntriesByPatientId(patientId, parsedLimit, parsedOffset)
+        findEntriesByPatientId(patientId, parsedLimit, parsedOffset),
       ]);
     }
 
@@ -68,12 +79,12 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse) {
     if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
       const start = new Date(startDate);
       const end = new Date(endDate);
-      
-      entries = entries.filter(entry => {
+
+      entries = entries.filter((entry) => {
         const entryDate = new Date(entry.occurredAt);
         return entryDate >= start && entryDate <= end;
       });
-      
+
       // Recalculate total count for filtered results
       totalCount = entries.length;
     }
@@ -130,9 +141,10 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     const validatedData = createEntrySchema.parse(req.body);
 
     // Convert occurredAt to Date if it's a string
-    const occurredAt = validatedData.occurredAt instanceof Date 
-      ? validatedData.occurredAt 
-      : new Date(validatedData.occurredAt);
+    const occurredAt =
+      validatedData.occurredAt instanceof Date
+        ? validatedData.occurredAt
+        : new Date(validatedData.occurredAt);
 
     // Prepare entry data
     const entryData: Parameters<typeof createEntry>[0] = {
@@ -185,4 +197,4 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
 
     res.status(500).json({ error: 'Failed to create entry' });
   }
-} 
+}

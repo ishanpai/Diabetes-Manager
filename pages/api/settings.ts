@@ -1,13 +1,7 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
-import {
-  findUserSettingsByUserId,
-  upsertUserSettings,
-} from '@/lib/database';
+import { findUserSettingsByUserId, upsertUserSettings } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { getSessionUserId } from '@/lib/utils/session';
 
@@ -33,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 async function getSettings(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
     const settings = await findUserSettingsByUserId(userId);
-    
+
     // Return default settings if none exist
     const defaultSettings = {
       glucoseUnits: 'mg/dL' as const,
@@ -41,9 +35,11 @@ async function getSettings(req: NextApiRequest, res: NextApiResponse, userId: st
 
     res.status(200).json({
       success: true,
-      data: settings ? {
-        glucoseUnits: settings.glucoseUnits,
-      } : defaultSettings,
+      data: settings
+        ? {
+            glucoseUnits: settings.glucoseUnits,
+          }
+        : defaultSettings,
     });
   } catch (error) {
     logger.error('Error fetching settings:', error);
@@ -83,4 +79,4 @@ async function updateSettings(req: NextApiRequest, res: NextApiResponse, userId:
 
     res.status(500).json({ error: 'Failed to update settings' });
   }
-} 
+}

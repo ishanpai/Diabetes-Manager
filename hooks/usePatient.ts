@@ -18,23 +18,25 @@ export function usePatient(patientId: string): UsePatientReturn {
   const [error, setError] = useState<string | null>(null);
 
   const fetchPatient = useCallback(async () => {
-    if (!patientId) {return;}
-    
+    if (!patientId) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch(`/api/patients/${patientId}`);
-      
+
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error('Patient not found');
         }
         throw new Error('Failed to fetch patient');
       }
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         setPatient(result.data);
       } else {
@@ -49,12 +51,14 @@ export function usePatient(patientId: string): UsePatientReturn {
   }, [patientId]);
 
   const updatePatient = async (data: Partial<PatientWithEntries>) => {
-    if (!patientId) {return;}
-    
+    if (!patientId) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch(`/api/patients/${patientId}`, {
         method: 'PUT',
         headers: {
@@ -68,7 +72,7 @@ export function usePatient(patientId: string): UsePatientReturn {
       }
 
       const result = await response.json();
-      
+
       if (result.success) {
         setPatient(result.data);
       } else {
@@ -84,12 +88,14 @@ export function usePatient(patientId: string): UsePatientReturn {
   };
 
   const deletePatient = async () => {
-    if (!patientId) {return;}
-    
+    if (!patientId) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch(`/api/patients/${patientId}`, {
         method: 'DELETE',
       });
@@ -99,7 +105,7 @@ export function usePatient(patientId: string): UsePatientReturn {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.error || 'Failed to delete patient');
       }
@@ -124,4 +130,4 @@ export function usePatient(patientId: string): UsePatientReturn {
     updatePatient,
     deletePatient,
   };
-} 
+}

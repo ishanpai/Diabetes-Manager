@@ -1,13 +1,7 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 
 import { hashPassword } from '@/lib/auth';
-import {
-  createUser,
-  findUserByEmail,
-} from '@/lib/database';
+import { createUser, findUserByEmail } from '@/lib/database';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -33,12 +27,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Hash the password
   const hashedPassword = await hashPassword(password);
 
-  const user = await createUser({ 
-    email, 
-    name, 
-    password: hashedPassword 
+  const user = await createUser({
+    email,
+    name,
+    password: hashedPassword,
   });
-  
+
   if (!user) {
     return res.status(500).json({ error: 'Failed to create user' });
   }
@@ -49,4 +43,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     email: user.email,
     image: user.image,
   });
-} 
+}

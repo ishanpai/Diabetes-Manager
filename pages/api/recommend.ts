@@ -1,7 +1,4 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
 import { GLUCOSE_TARGET_RANGES } from '@/lib/config';
@@ -13,12 +10,7 @@ import {
 } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { getSessionUserId } from '@/lib/utils/session';
-import type {
-  Entry,
-  Medication,
-  Patient,
-  Recommendation,
-} from '@/types';
+import type { Entry, Medication, Patient, Recommendation } from '@/types';
 import OpenAI from 'openai';
 
 import NextAuth from './auth/[...nextauth]';
@@ -43,7 +35,12 @@ type SSEMessage =
 
 type AIRecommendationResult = Pick<
   Recommendation,
-  'doseUnits' | 'medicationName' | 'reasoning' | 'safetyNotes' | 'confidence' | 'recommendedMonitoring'
+  | 'doseUnits'
+  | 'medicationName'
+  | 'reasoning'
+  | 'safetyNotes'
+  | 'confidence'
+  | 'recommendedMonitoring'
 >;
 
 type PromptPatient = Patient & {
@@ -78,16 +75,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   return createRecommendationHandler(req, res, userId);
 }
 
-async function createRecommendationHandler(req: NextApiRequest, res: NextApiResponse, userId: string) {
+async function createRecommendationHandler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+) {
   try {
     // Debug: log the incoming request body
     logger.debug('Incoming /api/recommend request body:', req.body);
-    
+
     // Set up SSE headers for streaming
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Cache-Control',
     });
@@ -108,7 +109,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
       res.write(`data: ${JSON.stringify(message)}\n\n`);
       res.end();
     };
-    
+
     // If userId is an email, find the user first
     let actualUserId = userId;
     if (userId.includes('@')) {
@@ -138,11 +139,11 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
 
     // Check authentication and send progress
     sendProgress('gathering-data', 'Checking authentication...');
-    await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for visibility
+    await new Promise((resolve) => setTimeout(resolve, 500)); // Small delay for visibility
 
     // Verify patient exists and belongs to user
     sendProgress('gathering-data', 'Loading patient data...');
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
     const patient = await findPatientById(patientId);
     if (!patient) {
       return sendError('Patient not found');
@@ -154,10 +155,10 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
 
     // Get recent entries for the last 72 hours
     sendProgress('gathering-data', 'Loading recent entries...');
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 400));
     const entries = await findEntriesByPatientId(patientId);
-    const recentEntries = entries.filter(entry => 
-      new Date(entry.occurredAt) >= new Date(Date.now() - 72 * 60 * 60 * 1000)
+    const recentEntries = entries.filter(
+      (entry) => new Date(entry.occurredAt) >= new Date(Date.now() - 72 * 60 * 60 * 1000),
     );
     logger.debug('Recent entries count:', recentEntries.length);
     sendProgress('gathering-data', `Found ${recentEntries.length} recent entries`);
@@ -170,21 +171,21 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
 
     // Build the prompt for the AI model
     sendProgress('building-prompt', 'Building AI prompt...');
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 400));
     const prompt = buildRecommendationPrompt(patient, recentEntries, targetDateTime, userTimezone);
     sendProgress('building-prompt', 'Prompt built successfully');
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Call OpenAI API for recommendation
     sendProgress('waiting-for-model', 'Calling AI model...');
     const aiRecommendation = await getAIRecommendation(prompt);
     logger.debug('AI recommendation received:', aiRecommendation);
     sendProgress('waiting-for-model', 'AI response received');
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Parse and save the recommendation
     sendProgress('parsing-response', 'Processing recommendation...');
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 400));
     const savedRecommendation = await createRecommendation({
       patientId,
       prompt,
@@ -203,7 +204,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
 
     logger.info('Recommendation saved to database');
     sendProgress('parsing-response', 'Recommendation saved');
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     const result: RecommendationPayload = {
       id: savedRecommendation.id,
@@ -224,9 +225,11 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
   } catch (error) {
     logger.error('Recommendation error:', error);
     logger.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    
+
     if (error instanceof z.ZodError) {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Invalid request data', details: error.errors })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ type: 'error', error: 'Invalid request data', details: error.errors })}\n\n`,
+      );
     } else {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Internal server error' })}\n\n`);
     }
@@ -256,7 +259,9 @@ function buildRecommendationPrompt(
   }
 
   // Calculate age
-  const age = Math.floor((new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  const age = Math.floor(
+    (new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+  );
 
   // Analyze medication timing patterns from recent history
   const insulinEntries = entries.filter((entry) => entry.entryType === 'insulin');
@@ -280,46 +285,65 @@ Target Administration Time: ${formatLocalTime(targetTime, timeZone)}
 `;
 
   // Sort entries by occurredAt in descending order (newest first) for better AI comprehension
-  const sortedEntries = [...entries].sort((a, b) => 
-    new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+  const sortedEntries = [...entries].sort(
+    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
   );
 
   // Separate entries into most recent (last 24 hours) and older (24-72 hours)
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  
-  const mostRecentEntries = sortedEntries.filter(entry => 
-    new Date(entry.occurredAt) >= twentyFourHoursAgo
-  );
-  
-  const olderEntries = sortedEntries.filter(entry => 
-    new Date(entry.occurredAt) < twentyFourHoursAgo
+
+  const mostRecentEntries = sortedEntries.filter(
+    (entry) => new Date(entry.occurredAt) >= twentyFourHoursAgo,
   );
 
-  const recentHistory = entries.length > 0 
-    ? `<RECENT_HISTORY>
-${mostRecentEntries.length > 0 ? `MOST RECENT ENTRIES (Last 24 hours):
-${mostRecentEntries.map(entry => `<${entry.entryType.toUpperCase()}>
-    <VALUE>${entry.value}${entry.units ? ` ${entry.units}` : ''} ${entry.medicationBrand ? `(${entry.medicationBrand})` : ''}</VALUE>
-    <OCCURRED_AT>${formatLocalTime(new Date(entry.occurredAt), timeZone)}</OCCURRED_AT>
-    </${entry.entryType.toUpperCase()}>`).join('\n')}` : 'No entries in the last 24 hours.'}
+  const olderEntries = sortedEntries.filter(
+    (entry) => new Date(entry.occurredAt) < twentyFourHoursAgo,
+  );
 
-${olderEntries.length > 0 ? `OLDER ENTRIES (24-72 hours ago):
-${olderEntries.map(entry => `<${entry.entryType.toUpperCase()}>
+  const recentHistory =
+    entries.length > 0
+      ? `<RECENT_HISTORY>
+${
+  mostRecentEntries.length > 0
+    ? `MOST RECENT ENTRIES (Last 24 hours):
+${mostRecentEntries
+  .map(
+    (entry) => `<${entry.entryType.toUpperCase()}>
     <VALUE>${entry.value}${entry.units ? ` ${entry.units}` : ''} ${entry.medicationBrand ? `(${entry.medicationBrand})` : ''}</VALUE>
     <OCCURRED_AT>${formatLocalTime(new Date(entry.occurredAt), timeZone)}</OCCURRED_AT>
-    </${entry.entryType.toUpperCase()}>`).join('\n')}` : ''}
+    </${entry.entryType.toUpperCase()}>`,
+  )
+  .join('\n')}`
+    : 'No entries in the last 24 hours.'
+}
+
+${
+  olderEntries.length > 0
+    ? `OLDER ENTRIES (24-72 hours ago):
+${olderEntries
+  .map(
+    (entry) => `<${entry.entryType.toUpperCase()}>
+    <VALUE>${entry.value}${entry.units ? ` ${entry.units}` : ''} ${entry.medicationBrand ? `(${entry.medicationBrand})` : ''}</VALUE>
+    <OCCURRED_AT>${formatLocalTime(new Date(entry.occurredAt), timeZone)}</OCCURRED_AT>
+    </${entry.entryType.toUpperCase()}>`,
+  )
+  .join('\n')}`
+    : ''
+}
 </RECENT_HISTORY>`
-    : `<RECENT_HISTORY>
+      : `<RECENT_HISTORY>
 No recent entries in the last 72 hours.
 </RECENT_HISTORY>`;
 
-  const patternAnalysis = medicationPatterns ? `
+  const patternAnalysis = medicationPatterns
+    ? `
 <MEDICATION_PATTERN_ANALYSIS>
 Based on recent insulin administration patterns:
 ${medicationPatterns}
 </MEDICATION_PATTERN_ANALYSIS>
-` : '';
+`
+    : '';
 
   const morningTargetMin = GLUCOSE_TARGET_RANGES.targetMin;
   const morningTargetMax = GLUCOSE_TARGET_RANGES.targetMax;
@@ -429,7 +453,7 @@ Remember: This is a medical recommendation that should be reviewed by healthcare
 
 function analyzeMedicationPatterns(insulinEntries: Entry[], _targetTime: Date, timeZone: string) {
   if (insulinEntries.length === 0) {
-    return "No recent insulin administration patterns available.";
+    return 'No recent insulin administration patterns available.';
   }
 
   // Group entries by time of day using the user's timezone
@@ -441,97 +465,129 @@ function analyzeMedicationPatterns(insulinEntries: Entry[], _targetTime: Date, t
     return trimmed.length > 0 ? trimmed : null;
   };
 
-  const morningEntries = insulinEntries.filter(entry => {
-    const hour = Number(new Date(entry.occurredAt).toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone }));
+  const morningEntries = insulinEntries.filter((entry) => {
+    const hour = Number(
+      new Date(entry.occurredAt).toLocaleString('en-US', {
+        hour: '2-digit',
+        hour12: false,
+        timeZone,
+      }),
+    );
     return hour >= 6 && hour < 12;
   });
-  
-  const afternoonEntries = insulinEntries.filter(entry => {
-    const hour = Number(new Date(entry.occurredAt).toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone }));
+
+  const afternoonEntries = insulinEntries.filter((entry) => {
+    const hour = Number(
+      new Date(entry.occurredAt).toLocaleString('en-US', {
+        hour: '2-digit',
+        hour12: false,
+        timeZone,
+      }),
+    );
     return hour >= 12 && hour < 18;
   });
-  
-  const eveningEntries = insulinEntries.filter(entry => {
-    const hour = Number(new Date(entry.occurredAt).toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone }));
+
+  const eveningEntries = insulinEntries.filter((entry) => {
+    const hour = Number(
+      new Date(entry.occurredAt).toLocaleString('en-US', {
+        hour: '2-digit',
+        hour12: false,
+        timeZone,
+      }),
+    );
     return hour >= 18 || hour < 6;
   });
 
   const patterns = [];
-  
+
   if (morningEntries.length > 0) {
     const morningMeds = morningEntries
-      .map(e => normalizeBrand(e.medicationBrand))
+      .map((e) => normalizeBrand(e.medicationBrand))
       .filter((brand): brand is string => Boolean(brand));
     const mostCommonMorning = getMostCommon(morningMeds);
     if (mostCommonMorning) {
-      patterns.push(`Morning (6 AM - 12 PM): Primarily uses ${mostCommonMorning} (${morningEntries.length} entries)`);
+      patterns.push(
+        `Morning (6 AM - 12 PM): Primarily uses ${mostCommonMorning} (${morningEntries.length} entries)`,
+      );
     }
   }
-  
+
   if (afternoonEntries.length > 0) {
     const afternoonMeds = afternoonEntries
-      .map(e => normalizeBrand(e.medicationBrand))
+      .map((e) => normalizeBrand(e.medicationBrand))
       .filter((brand): brand is string => Boolean(brand));
     const mostCommonAfternoon = getMostCommon(afternoonMeds);
     if (mostCommonAfternoon) {
-      patterns.push(`Afternoon (12 PM - 6 PM): Primarily uses ${mostCommonAfternoon} (${afternoonEntries.length} entries)`);
+      patterns.push(
+        `Afternoon (12 PM - 6 PM): Primarily uses ${mostCommonAfternoon} (${afternoonEntries.length} entries)`,
+      );
     }
   }
-  
+
   if (eveningEntries.length > 0) {
     const eveningMeds = eveningEntries
-      .map(e => normalizeBrand(e.medicationBrand))
+      .map((e) => normalizeBrand(e.medicationBrand))
       .filter((brand): brand is string => Boolean(brand));
     const mostCommonEvening = getMostCommon(eveningMeds);
     if (mostCommonEvening) {
-      patterns.push(`Evening/Night (6 PM - 6 AM): Primarily uses ${mostCommonEvening} (${eveningEntries.length} entries)`);
+      patterns.push(
+        `Evening/Night (6 PM - 6 AM): Primarily uses ${mostCommonEvening} (${eveningEntries.length} entries)`,
+      );
     }
   }
 
   // Analyze dose patterns
-  const recentDoses = insulinEntries.slice(0, 5).map(e => parseFloat(e.value)).filter(d => !isNaN(d));
+  const recentDoses = insulinEntries
+    .slice(0, 5)
+    .map((e) => parseFloat(e.value))
+    .filter((d) => !isNaN(d));
   if (recentDoses.length > 0) {
     const avgDose = recentDoses.reduce((a, b) => a + b, 0) / recentDoses.length;
-    patterns.push(`Recent dose range: ${Math.min(...recentDoses)}-${Math.max(...recentDoses)} IU (average: ${avgDose.toFixed(1)} IU)`);
+    patterns.push(
+      `Recent dose range: ${Math.min(...recentDoses)}-${Math.max(...recentDoses)} IU (average: ${avgDose.toFixed(1)} IU)`,
+    );
   }
 
-  return patterns.length > 0 ? patterns.join('\n') : "Limited pattern data available.";
+  return patterns.length > 0 ? patterns.join('\n') : 'Limited pattern data available.';
 }
 
-function getMostCommon(arr: (string)[]): string | null {
-  if (arr.length === 0) {return null;}
-  
+function getMostCommon(arr: string[]): string | null {
+  if (arr.length === 0) {
+    return null;
+  }
+
   const counts: { [key: string]: number } = {};
-  arr.forEach(item => {
+  arr.forEach((item) => {
     counts[item] = (counts[item] || 0) + 1;
   });
-  
-  return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+
+  return Object.keys(counts).reduce((a, b) => (counts[a] > counts[b] ? a : b));
 }
 
 async function getAIRecommendation(prompt: string): Promise<AIRecommendationResult> {
   try {
     logger.debug('Calling OpenAI API...');
-    
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: 'gpt-4o-mini',
       messages: [
         {
-          role: "system",
-          content: "You are a medical AI assistant specializing in diabetes management and insulin dosing recommendations. You provide evidence-based recommendations based on patient data, but always remind users that these are suggestions and should be reviewed by healthcare professionals. Be conservative in your recommendations and prioritize patient safety. You must respond only with valid JSON in the exact format requested."
+          role: 'system',
+          content:
+            'You are a medical AI assistant specializing in diabetes management and insulin dosing recommendations. You provide evidence-based recommendations based on patient data, but always remind users that these are suggestions and should be reviewed by healthcare professionals. Be conservative in your recommendations and prioritize patient safety. You must respond only with valid JSON in the exact format requested.',
         },
         {
-          role: "user",
-          content: prompt
-        }
+          role: 'user',
+          content: prompt,
+        },
       ],
       temperature: 0.2, // Lower temperature for more consistent medical recommendations
       max_tokens: 1000,
-      response_format: { type: "json_object" }, // Ensure JSON response
+      response_format: { type: 'json_object' }, // Ensure JSON response
     });
 
     logger.debug('OpenAI response received');
-    
+
     const responseContent = completion.choices[0]?.message?.content;
     if (!responseContent) {
       throw new Error('No response content from OpenAI');
@@ -544,18 +600,20 @@ async function getAIRecommendation(prompt: string): Promise<AIRecommendationResu
       const parsed = JSON.parse(responseContent) as Record<string, unknown>;
       return {
         doseUnits: typeof parsed.doseUnits === 'number' ? parsed.doseUnits : undefined,
-        medicationName: typeof parsed.medicationName === 'string' ? parsed.medicationName : undefined,
+        medicationName:
+          typeof parsed.medicationName === 'string' ? parsed.medicationName : undefined,
         reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : undefined,
         safetyNotes: typeof parsed.safetyNotes === 'string' ? parsed.safetyNotes : undefined,
         confidence: normalizeConfidence(parsed.confidence),
-        recommendedMonitoring: typeof parsed.recommendedMonitoring === 'string'
-          ? parsed.recommendedMonitoring
-          : undefined,
+        recommendedMonitoring:
+          typeof parsed.recommendedMonitoring === 'string'
+            ? parsed.recommendedMonitoring
+            : undefined,
       };
     } catch (parseError) {
       logger.error('Error parsing JSON from AI response:', parseError);
       logger.error('Response content:', responseContent);
-      
+
       // Fallback: extract dose and reasoning from text
       const doseMatch = responseContent.match(/"doseUnits"\s*:\s*(\d+(?:\.\d+)?)/);
       const doseUnits = doseMatch ? parseFloat(doseMatch[1]) : 8;
@@ -569,10 +627,9 @@ async function getAIRecommendation(prompt: string): Promise<AIRecommendationResu
         recommendedMonitoring: 'Please consult healthcare provider',
       };
     }
-
   } catch (error) {
     logger.error('OpenAI API error:', error);
-    
+
     // Fallback to mock recommendation if OpenAI fails
     logger.warn('Falling back to mock recommendation');
     return {
@@ -598,41 +655,46 @@ function normalizeConfidence(confidence: unknown): Recommendation['confidence'] 
   return undefined;
 }
 
-function checkSufficientHistory(entries: Entry[]): { hasSufficientHistory: boolean; message: string } {
+function checkSufficientHistory(entries: Entry[]): {
+  hasSufficientHistory: boolean;
+  message: string;
+} {
   const totalEntries = entries.length;
-  
+
   if (totalEntries === 0) {
     return {
       hasSufficientHistory: false,
-      message: "No patient history found. Please add at least 1 day of glucose readings, meals, and insulin doses before getting recommendations."
+      message:
+        'No patient history found. Please add at least 1 day of glucose readings, meals, and insulin doses before getting recommendations.',
     };
   }
-  
+
   if (totalEntries < 3) {
     return {
       hasSufficientHistory: false,
-      message: `Only ${totalEntries} entries found. Please add at least 3 entries (glucose, meals, insulin) over at least 1 day before getting recommendations.`
+      message: `Only ${totalEntries} entries found. Please add at least 3 entries (glucose, meals, insulin) over at least 1 day before getting recommendations.`,
     };
   }
-  
+
   // Check if we have entries from at least 1 day ago
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-  
-  const hasHistoricalData = entries.some(entry => {
+
+  const hasHistoricalData = entries.some((entry) => {
     const entryDate = new Date(entry.occurredAt);
     return entryDate < oneDayAgo;
   });
-  
+
   if (!hasHistoricalData) {
     return {
       hasSufficientHistory: false,
-      message: "All entries are from today. Please add entries from at least 1 day ago to provide better context for recommendations."
+      message:
+        'All entries are from today. Please add entries from at least 1 day ago to provide better context for recommendations.',
     };
   }
-  
+
   return {
     hasSufficientHistory: true,
-    message: "Sufficient history available for recommendations."
+    message: 'Sufficient history available for recommendations.',
   };
-} 
+}

@@ -214,7 +214,7 @@ export interface AIRecommendationResponse {
 }
 
 // Progress states for recommendation flow
-export type RecommendationProgress = 
+export type RecommendationProgress =
   | 'idle'
   | 'gathering-data'
   | 'building-prompt'
@@ -267,4 +267,4 @@ export interface EntryApiResponse extends Omit<Entry, 'occurredAt' | 'createdAt'
   occurredAt: string;
   createdAt: string;
   updatedAt: string;
-} 
+}

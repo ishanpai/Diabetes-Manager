@@ -55,57 +55,65 @@ export const useAppStore = create<AppStore>()(
       ...initialState,
 
       setUser: (user) => set({ user }),
-      
+
       setCurrentPatient: (patient) => set({ currentPatient: patient }),
-      
+
       setPatients: (patients) => set({ patients }),
-      
-      addPatient: (patient) => set((state) => ({
-        patients: [...state.patients, patient]
-      })),
-      
-      updatePatient: (patient) => set((state) => ({
-        patients: state.patients.map(p => p.id === patient.id ? patient : p),
-        currentPatient: state.currentPatient?.id === patient.id ? patient : state.currentPatient
-      })),
-      
-      removePatient: (patientId) => set((state) => ({
-        patients: state.patients.filter(p => p.id !== patientId),
-        currentPatient: state.currentPatient?.id === patientId ? null : state.currentPatient
-      })),
-      
+
+      addPatient: (patient) =>
+        set((state) => ({
+          patients: [...state.patients, patient],
+        })),
+
+      updatePatient: (patient) =>
+        set((state) => ({
+          patients: state.patients.map((p) => (p.id === patient.id ? patient : p)),
+          currentPatient: state.currentPatient?.id === patient.id ? patient : state.currentPatient,
+        })),
+
+      removePatient: (patientId) =>
+        set((state) => ({
+          patients: state.patients.filter((p) => p.id !== patientId),
+          currentPatient: state.currentPatient?.id === patientId ? null : state.currentPatient,
+        })),
+
       setEntries: (entries) => set({ entries }),
-      
-      addEntry: (entry) => set((state) => ({
-        entries: [entry, ...state.entries]
-      })),
-      
-      updateEntry: (entry) => set((state) => ({
-        entries: state.entries.map(e => e.id === entry.id ? entry : e)
-      })),
-      
-      removeEntry: (entryId) => set((state) => ({
-        entries: state.entries.filter(e => e.id !== entryId)
-      })),
-      
+
+      addEntry: (entry) =>
+        set((state) => ({
+          entries: [entry, ...state.entries],
+        })),
+
+      updateEntry: (entry) =>
+        set((state) => ({
+          entries: state.entries.map((e) => (e.id === entry.id ? entry : e)),
+        })),
+
+      removeEntry: (entryId) =>
+        set((state) => ({
+          entries: state.entries.filter((e) => e.id !== entryId),
+        })),
+
       setRecommendations: (recommendations) => set({ recommendations }),
-      
-      addRecommendation: (recommendation) => set((state) => ({
-        recommendations: [recommendation, ...state.recommendations]
-      })),
-      
+
+      addRecommendation: (recommendation) =>
+        set((state) => ({
+          recommendations: [recommendation, ...state.recommendations],
+        })),
+
       setLoading: (isLoading) => set({ isLoading }),
-      
+
       setError: (error) => set({ error }),
-      
+
       setRecommendationProgress: (recommendationProgress) => set({ recommendationProgress }),
-      
-      setGlucoseUnit: (glucose) => set((state) => ({
-        units: { ...state.units, glucose }
-      })),
-      
+
+      setGlucoseUnit: (glucose) =>
+        set((state) => ({
+          units: { ...state.units, glucose },
+        })),
+
       clearError: () => set({ error: null }),
-      
+
       logout: () => set(initialState),
     }),
     {
@@ -116,8 +124,8 @@ export const useAppStore = create<AppStore>()(
         patients: state.patients,
         units: state.units,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Selectors for better performance
@@ -138,21 +146,21 @@ export const usePatientEntries = (patientId?: string) => {
   const targetPatientId = patientId || currentPatient?.id;
 
   logger.debug('Entries selector result:', entries);
-  
-  return targetPatientId ? entries.filter(entry => entry.patientId === targetPatientId) : [];
+
+  return targetPatientId ? entries.filter((entry) => entry.patientId === targetPatientId) : [];
 };
 
 export const useGlucoseEntries = (patientId?: string) => {
   const entries = usePatientEntries(patientId);
-  return entries.filter(entry => entry.entryType === 'glucose');
+  return entries.filter((entry) => entry.entryType === 'glucose');
 };
 
 export const useMealEntries = (patientId?: string) => {
   const entries = usePatientEntries(patientId);
-  return entries.filter(entry => entry.entryType === 'meal');
+  return entries.filter((entry) => entry.entryType === 'meal');
 };
 
 export const useInsulinEntries = (patientId?: string) => {
   const entries = usePatientEntries(patientId);
-  return entries.filter(entry => entry.entryType === 'insulin');
-}; 
+  return entries.filter((entry) => entry.entryType === 'insulin');
+};

@@ -1,35 +1,19 @@
-import {
-  and,
-  desc,
-  eq,
-  gte,
-  lte,
-  sql,
-} from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 
-import type {
-  Entry,
-  Patient,
-  Recommendation,
-  User,
-} from '@/types';
+import type { Entry, Patient, Recommendation, User } from '@/types';
 
 import { db } from './db';
-import {
-  entries,
-  patients,
-  recommendations,
-  users,
-  userSettings,
-} from './schema';
+import { entries, patients, recommendations, users, userSettings } from './schema';
 import { logger } from './logger';
 
 // User functions
 export async function findUserByEmail(email: string): Promise<User | null> {
   try {
     const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (result.length === 0) {return null;}
-    
+    if (result.length === 0) {
+      return null;
+    }
+
     const user = result[0];
     return {
       id: user.id,
@@ -47,7 +31,7 @@ export async function findUserByEmail(email: string): Promise<User | null> {
 export async function findUsers(): Promise<User[]> {
   try {
     const result = await db.select().from(users);
-    return result.map(user => ({
+    return result.map((user) => ({
       id: user.id,
       email: user.email,
       name: user.name,
@@ -60,11 +44,18 @@ export async function findUsers(): Promise<User[]> {
   }
 }
 
-export async function createUser(userData: { email: string; name?: string; image?: string; password?: string }): Promise<User | null> {
+export async function createUser(userData: {
+  email: string;
+  name?: string;
+  image?: string;
+  password?: string;
+}): Promise<User | null> {
   try {
     const result = await db.insert(users).values(userData).returning();
-    if (result.length === 0) {return null;}
-    
+    if (result.length === 0) {
+      return null;
+    }
+
     const user = result[0];
     return {
       id: user.id,
@@ -80,16 +71,21 @@ export async function createUser(userData: { email: string; name?: string; image
 }
 
 // Patient functions
-export async function findPatientsByUserId(userId: string, limit?: number, offset?: number): Promise<Patient[]> {
+export async function findPatientsByUserId(
+  userId: string,
+  limit?: number,
+  offset?: number,
+): Promise<Patient[]> {
   try {
-    const result = await db.select()
+    const result = await db
+      .select()
       .from(patients)
       .where(eq(patients.userId, userId))
       .orderBy(desc(patients.createdAt))
       .limit(limit || 1000)
       .offset(offset || 0);
-    
-    return result.map(patient => ({
+
+    return result.map((patient) => ({
       id: patient.id,
       name: patient.name,
       dob: patient.dob,
@@ -111,8 +107,10 @@ export async function findPatientsByUserId(userId: string, limit?: number, offse
 export async function findPatientById(patientId: string): Promise<Patient | null> {
   try {
     const result = await db.select().from(patients).where(eq(patients.id, patientId)).limit(1);
-    if (result.length === 0) {return null;}
-    
+    if (result.length === 0) {
+      return null;
+    }
+
     const patient = result[0];
     return {
       id: patient.id,
@@ -144,8 +142,10 @@ export async function createPatient(patientData: {
 }): Promise<Patient | null> {
   try {
     const result = await db.insert(patients).values(patientData).returning();
-    if (result.length === 0) {return null;}
-    
+    if (result.length === 0) {
+      return null;
+    }
+
     const patient = result[0];
     return {
       id: patient.id,
@@ -166,22 +166,28 @@ export async function createPatient(patientData: {
   }
 }
 
-export async function updatePatient(patientId: string, updates: Partial<{
-  name: string;
-  dob: Date;
-  diabetesType: string;
-  lifestyle: string;
-  activityLevel: string;
-  usualMedications: Array<{ brand: string; dosage: string; timing?: string }>;
-}>): Promise<Patient | null> {
+export async function updatePatient(
+  patientId: string,
+  updates: Partial<{
+    name: string;
+    dob: Date;
+    diabetesType: string;
+    lifestyle: string;
+    activityLevel: string;
+    usualMedications: Array<{ brand: string; dosage: string; timing?: string }>;
+  }>,
+): Promise<Patient | null> {
   try {
-    const result = await db.update(patients)
+    const result = await db
+      .update(patients)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(patients.id, patientId))
       .returning();
-    
-    if (result.length === 0) {return null;}
-    
+
+    if (result.length === 0) {
+      return null;
+    }
+
     const patient = result[0];
     return {
       id: patient.id,
@@ -213,16 +219,21 @@ export async function deletePatient(patientId: string): Promise<boolean> {
 }
 
 // Entry functions
-export async function findEntriesByPatientId(patientId: string, limit?: number, offset?: number): Promise<Entry[]> {
+export async function findEntriesByPatientId(
+  patientId: string,
+  limit?: number,
+  offset?: number,
+): Promise<Entry[]> {
   try {
-    const result = await db.select()
+    const result = await db
+      .select()
       .from(entries)
       .where(eq(entries.patientId, patientId))
       .orderBy(desc(entries.occurredAt))
       .limit(limit || 1000)
       .offset(offset || 0);
-    
-    return result.map(entry => ({
+
+    return result.map((entry) => ({
       id: entry.id,
       patientId: entry.patientId,
       entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
@@ -238,21 +249,22 @@ export async function findEntriesByPatientId(patientId: string, limit?: number, 
   }
 }
 
-export async function findEntriesByPatientIdAndType(patientId: string, entryType: 'glucose' | 'meal' | 'insulin', limit?: number, offset?: number): Promise<Entry[]> {
+export async function findEntriesByPatientIdAndType(
+  patientId: string,
+  entryType: 'glucose' | 'meal' | 'insulin',
+  limit?: number,
+  offset?: number,
+): Promise<Entry[]> {
   try {
-    const result = await db.select()
+    const result = await db
+      .select()
       .from(entries)
-      .where(
-        and(
-          eq(entries.patientId, patientId),
-          eq(entries.entryType, entryType)
-        )
-      )
+      .where(and(eq(entries.patientId, patientId), eq(entries.entryType, entryType)))
       .orderBy(desc(entries.occurredAt))
       .limit(limit || 1000)
       .offset(offset || 0);
-    
-    return result.map(entry => ({
+
+    return result.map((entry) => ({
       id: entry.id,
       patientId: entry.patientId,
       entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
@@ -270,10 +282,11 @@ export async function findEntriesByPatientIdAndType(patientId: string, entryType
 
 export async function countEntriesByPatientId(patientId: string): Promise<number> {
   try {
-    const result = await db.select({ count: sql`count(*)` })
+    const result = await db
+      .select({ count: sql`count(*)` })
       .from(entries)
       .where(eq(entries.patientId, patientId));
-    
+
     return Number(result[0]?.count || 0);
   } catch (error) {
     logger.error('Error counting entries by patient ID:', error);
@@ -281,20 +294,25 @@ export async function countEntriesByPatientId(patientId: string): Promise<number
   }
 }
 
-export async function findEntriesByDateRange(patientId: string, startDate: Date, endDate: Date): Promise<Entry[]> {
+export async function findEntriesByDateRange(
+  patientId: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<Entry[]> {
   try {
-    const result = await db.select()
+    const result = await db
+      .select()
       .from(entries)
       .where(
         and(
           eq(entries.patientId, patientId),
           gte(entries.occurredAt, startDate),
-          lte(entries.occurredAt, endDate)
-        )
+          lte(entries.occurredAt, endDate),
+        ),
       )
       .orderBy(desc(entries.occurredAt));
-    
-    return result.map(entry => ({
+
+    return result.map((entry) => ({
       id: entry.id,
       patientId: entry.patientId,
       entryType: entry.entryType as 'glucose' | 'meal' | 'insulin',
@@ -320,8 +338,10 @@ export async function createEntry(entryData: {
 }): Promise<Entry | null> {
   try {
     const result = await db.insert(entries).values(entryData).returning();
-    if (result.length === 0) {return null;}
-    
+    if (result.length === 0) {
+      return null;
+    }
+
     const entry = result[0];
     return {
       id: entry.id,
@@ -339,20 +359,22 @@ export async function createEntry(entryData: {
   }
 }
 
-export async function updateEntry(entryId: string, updates: Partial<{
-  value: string;
-  units: string;
-  medicationBrand: string;
-  occurredAt: Date;
-}>): Promise<Entry | null> {
+export async function updateEntry(
+  entryId: string,
+  updates: Partial<{
+    value: string;
+    units: string;
+    medicationBrand: string;
+    occurredAt: Date;
+  }>,
+): Promise<Entry | null> {
   try {
-    const result = await db.update(entries)
-      .set(updates)
-      .where(eq(entries.id, entryId))
-      .returning();
-    
-    if (result.length === 0) {return null;}
-    
+    const result = await db.update(entries).set(updates).where(eq(entries.id, entryId)).returning();
+
+    if (result.length === 0) {
+      return null;
+    }
+
     const entry = result[0];
     return {
       id: entry.id,
@@ -383,8 +405,10 @@ export async function deleteEntry(entryId: string): Promise<boolean> {
 export async function findEntryById(entryId: string): Promise<Entry | null> {
   try {
     const result = await db.select().from(entries).where(eq(entries.id, entryId)).limit(1);
-    if (result.length === 0) {return null;}
-    
+    if (result.length === 0) {
+      return null;
+    }
+
     const entry = result[0];
     return {
       id: entry.id,
@@ -405,12 +429,13 @@ export async function findEntryById(entryId: string): Promise<Entry | null> {
 // Recommendation functions
 export async function findRecommendationsByPatientId(patientId: string): Promise<Recommendation[]> {
   try {
-    const result = await db.select()
+    const result = await db
+      .select()
       .from(recommendations)
       .where(eq(recommendations.patientId, patientId))
       .orderBy(desc(recommendations.createdAt));
-    
-    return result.map(rec => ({
+
+    return result.map((rec) => ({
       id: rec.id,
       patientId: rec.patientId,
       prompt: rec.prompt,
@@ -442,8 +467,10 @@ export async function createRecommendation(recommendationData: {
 }): Promise<Recommendation | null> {
   try {
     const result = await db.insert(recommendations).values(recommendationData).returning();
-    if (result.length === 0) {return null;}
-    
+    if (result.length === 0) {
+      return null;
+    }
+
     const rec = result[0];
     return {
       id: rec.id,
@@ -464,24 +491,30 @@ export async function createRecommendation(recommendationData: {
   }
 }
 
-export async function updateRecommendation(recommendationId: string, updates: Partial<{
-  prompt: string;
-  response: string;
-  doseUnits: number;
-  medicationName: string;
-  reasoning: string;
-  safetyNotes: string;
-  confidence: 'high' | 'medium' | 'low';
-  recommendedMonitoring: string;
-}>): Promise<Recommendation | null> {
+export async function updateRecommendation(
+  recommendationId: string,
+  updates: Partial<{
+    prompt: string;
+    response: string;
+    doseUnits: number;
+    medicationName: string;
+    reasoning: string;
+    safetyNotes: string;
+    confidence: 'high' | 'medium' | 'low';
+    recommendedMonitoring: string;
+  }>,
+): Promise<Recommendation | null> {
   try {
-    const result = await db.update(recommendations)
+    const result = await db
+      .update(recommendations)
       .set(updates)
       .where(eq(recommendations.id, recommendationId))
       .returning();
-    
-    if (result.length === 0) {return null;}
-    
+
+    if (result.length === 0) {
+      return null;
+    }
+
     const rec = result[0];
     return {
       id: rec.id,
@@ -504,7 +537,10 @@ export async function updateRecommendation(recommendationId: string, updates: Pa
 
 export async function deleteRecommendation(recommendationId: string): Promise<boolean> {
   try {
-    const result = await db.delete(recommendations).where(eq(recommendations.id, recommendationId)).returning();
+    const result = await db
+      .delete(recommendations)
+      .where(eq(recommendations.id, recommendationId))
+      .returning();
     return result.length > 0;
   } catch (error) {
     logger.error('Error deleting recommendation:', error);
@@ -515,9 +551,15 @@ export async function deleteRecommendation(recommendationId: string): Promise<bo
 // User settings functions
 export async function findUserSettings(userId: string): Promise<{ glucoseUnits: string } | null> {
   try {
-    const result = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
-    if (result.length === 0) {return null;}
-    
+    const result = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+    if (result.length === 0) {
+      return null;
+    }
+
     return {
       glucoseUnits: result[0].glucoseUnits,
     };
@@ -527,11 +569,16 @@ export async function findUserSettings(userId: string): Promise<{ glucoseUnits: 
   }
 }
 
-export async function createUserSettings(userId: string, glucoseUnits: string = 'mg/dL'): Promise<{ glucoseUnits: string } | null> {
+export async function createUserSettings(
+  userId: string,
+  glucoseUnits: string = 'mg/dL',
+): Promise<{ glucoseUnits: string } | null> {
   try {
     const result = await db.insert(userSettings).values({ userId, glucoseUnits }).returning();
-    if (result.length === 0) {return null;}
-    
+    if (result.length === 0) {
+      return null;
+    }
+
     return {
       glucoseUnits: result[0].glucoseUnits,
     };
@@ -541,15 +588,21 @@ export async function createUserSettings(userId: string, glucoseUnits: string = 
   }
 }
 
-export async function updateUserSettings(userId: string, glucoseUnits: string): Promise<{ glucoseUnits: string } | null> {
+export async function updateUserSettings(
+  userId: string,
+  glucoseUnits: string,
+): Promise<{ glucoseUnits: string } | null> {
   try {
-    const result = await db.update(userSettings)
+    const result = await db
+      .update(userSettings)
       .set({ glucoseUnits, updatedAt: new Date() })
       .where(eq(userSettings.userId, userId))
       .returning();
-    
-    if (result.length === 0) {return null;}
-    
+
+    if (result.length === 0) {
+      return null;
+    }
+
     return {
       glucoseUnits: result[0].glucoseUnits,
     };
@@ -559,14 +612,19 @@ export async function updateUserSettings(userId: string, glucoseUnits: string): 
   }
 }
 
-export async function findUserSettingsByUserId(userId: string): Promise<{ glucoseUnits: string } | null> {
+export async function findUserSettingsByUserId(
+  userId: string,
+): Promise<{ glucoseUnits: string } | null> {
   return findUserSettings(userId);
 }
 
-export async function upsertUserSettings(userId: string, glucoseUnits: string): Promise<{ glucoseUnits: string } | null> {
+export async function upsertUserSettings(
+  userId: string,
+  glucoseUnits: string,
+): Promise<{ glucoseUnits: string } | null> {
   try {
     const existingSettings = await findUserSettings(userId);
-    
+
     if (existingSettings) {
       return updateUserSettings(userId, glucoseUnits);
     } else {
@@ -583,10 +641,10 @@ function calculateAge(dob: Date): number {
   const today = new Date();
   let age = today.getFullYear() - dob.getFullYear();
   const monthDiff = today.getMonth() - dob.getMonth();
-  
+
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
     age--;
   }
-  
+
   return age;
 }

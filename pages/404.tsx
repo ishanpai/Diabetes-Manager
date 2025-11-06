@@ -1,10 +1,7 @@
 import { useRouter } from 'next/router';
 
 import { ErrorDisplay } from '@/components/ui/ErrorDisplay';
-import {
-  Box,
-  Container,
-} from '@mui/material';
+import { Box, Container } from '@mui/material';
 
 export default function Custom404() {
   const router = useRouter();
@@ -19,4 +16,4 @@ export default function Custom404() {
       </Container>
     </Box>
   );
-} 
+}

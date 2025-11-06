@@ -1,15 +1,8 @@
 import { useState } from 'react';
 
-import {
-  EntryForm,
-  EntryFormValues,
-} from '@/components/EntryForm';
+import { EntryForm, EntryFormValues } from '@/components/EntryForm';
 import { Entry, Medication } from '@/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@mui/material';
+import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 
 interface AddEntryDialogProps {
   open: boolean;
@@ -72,15 +65,8 @@ export function AddEntryDialog({
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-    >
-      <DialogTitle>
-        Add {entryType.charAt(0).toUpperCase() + entryType.slice(1)} Entry
-      </DialogTitle>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Add {entryType.charAt(0).toUpperCase() + entryType.slice(1)} Entry</DialogTitle>
       <DialogContent>
         <EntryForm
           entryType={entryType}
@@ -96,4 +82,4 @@ export function AddEntryDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}

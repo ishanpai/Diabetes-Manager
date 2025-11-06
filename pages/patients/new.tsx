@@ -70,4 +70,4 @@ export default function NewPatient() {
       submitButtonText="Save Patient"
     />
   );
-} 
+}

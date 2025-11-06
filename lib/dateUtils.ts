@@ -54,14 +54,17 @@ export const formatDateForDisplay = (date: Date, options?: Intl.DateTimeFormatOp
     month: 'short',
     day: 'numeric',
   };
-  
+
   return date.toLocaleDateString(undefined, { ...defaultOptions, ...options });
 };
 
 /**
  * Format a Date object for display with time
  */
-export const formatDateTimeForDisplay = (date: Date, options?: Intl.DateTimeFormatOptions): string => {
+export const formatDateTimeForDisplay = (
+  date: Date,
+  options?: Intl.DateTimeFormatOptions,
+): string => {
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
@@ -69,7 +72,7 @@ export const formatDateTimeForDisplay = (date: Date, options?: Intl.DateTimeForm
     hour: '2-digit',
     minute: '2-digit',
   };
-  
+
   return date.toLocaleString(undefined, { ...defaultOptions, ...options });
 };
 
@@ -92,9 +95,11 @@ export const calculateAge = (dob: Date | string): number => {
  */
 export const isToday = (date: Date): boolean => {
   const today = new Date();
-  return date.getDate() === today.getDate() &&
-         date.getMonth() === today.getMonth() &&
-         date.getFullYear() === today.getFullYear();
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  );
 };
 
 /**
@@ -103,10 +108,12 @@ export const isToday = (date: Date): boolean => {
 export const isYesterday = (date: Date): boolean => {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  
-  return date.getDate() === yesterday.getDate() &&
-         date.getMonth() === yesterday.getMonth() &&
-         date.getFullYear() === yesterday.getFullYear();
+
+  return (
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear()
+  );
 };
 
 /**
@@ -119,11 +126,21 @@ export const getRelativeTimeString = (date: Date): string => {
   const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
   const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
 
-  if (diffInMinutes < 1) {return 'Just now';}
-  if (diffInMinutes < 60) {return `${diffInMinutes} minutes ago`;}
-  if (diffInHours < 24) {return `${diffInHours} hours ago`;}
-  if (diffInDays === 1) {return 'Yesterday';}
-  if (diffInDays < 7) {return `${diffInDays} days ago`;}
-  
+  if (diffInMinutes < 1) {
+    return 'Just now';
+  }
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} minutes ago`;
+  }
+  if (diffInHours < 24) {
+    return `${diffInHours} hours ago`;
+  }
+  if (diffInDays === 1) {
+    return 'Yesterday';
+  }
+  if (diffInDays < 7) {
+    return `${diffInDays} days ago`;
+  }
+
   return formatDateForDisplay(date);
-}; 
+};

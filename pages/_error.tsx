@@ -1,10 +1,7 @@
 import { NextPageContext } from 'next';
 
 import { ErrorDisplay } from '@/components/ui/ErrorDisplay';
-import {
-  Box,
-  Container,
-} from '@mui/material';
+import { Box, Container } from '@mui/material';
 
 interface ErrorProps {
   statusCode?: number;
@@ -33,10 +30,7 @@ function Error({ statusCode, hasGetInitialPropsRun, err }: ErrorProps) {
   return (
     <Box minHeight="100vh" display="flex" alignItems="center" bgcolor="#fafafa">
       <Container maxWidth="sm">
-        <ErrorDisplay
-          error={getErrorMessage()}
-          onRetry={() => window.location.reload()}
-        />
+        <ErrorDisplay error={getErrorMessage()} onRetry={() => window.location.reload()} />
       </Container>
     </Box>
   );
@@ -47,4 +41,4 @@ Error.getInitialProps = ({ res, err }: NextPageContext) => {
   return { statusCode, hasGetInitialPropsRun: true };
 };
 
-export default Error; 
+export default Error;

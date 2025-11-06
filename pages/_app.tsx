@@ -4,10 +4,7 @@ import { Toaster } from 'react-hot-toast';
 
 import Layout from '@/components/Layout';
 import CssBaseline from '@mui/material/CssBaseline';
-import {
-  createTheme,
-  ThemeProvider,
-} from '@mui/material/styles';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 // Create a theme instance
 const theme = createTheme({
@@ -101,4 +98,4 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       </ThemeProvider>
     </SessionProvider>
   );
-} 
+}

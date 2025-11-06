@@ -1,7 +1,4 @@
-import {
-  Medication,
-  Patient,
-} from '@/types';
+import { Medication, Patient } from '@/types';
 import { logger } from '@/lib/logger';
 
 type RawPatient = Patient & {
@@ -19,12 +16,12 @@ export interface PatientWithParsedMedications extends Omit<Patient, 'usualMedica
  */
 export function parsePatientMedications(patient: RawPatient): PatientWithParsedMedications {
   let medications: Medication[] = [];
-  
+
   if (typeof patient.usualMedications === 'string') {
     try {
       medications = JSON.parse(patient.usualMedications || '[]');
       // Trim medication fields to clean up any trailing whitespace
-      medications = medications.map(med => ({
+      medications = medications.map((med) => ({
         brand: med.brand?.trim() || '',
         dosage: med.dosage?.trim() || '',
         timing: med.timing?.trim() || '',
@@ -34,16 +31,16 @@ export function parsePatientMedications(patient: RawPatient): PatientWithParsedM
       medications = [];
     }
   } else if (Array.isArray(patient.usualMedications)) {
-    medications = patient.usualMedications.map(med => ({
+    medications = patient.usualMedications.map((med) => ({
       brand: med.brand?.trim() || '',
       dosage: med.dosage?.trim() || '',
       timing: med.timing?.trim() || '',
     }));
   }
-  
+
   return {
     ...patient,
-    usualMedications: medications
+    usualMedications: medications,
   };
 }
 

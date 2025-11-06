@@ -1,17 +1,8 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
-import {
-  signIn,
-  useSession,
-} from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import {
-  Controller,
-  useForm,
-} from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { z } from 'zod';
 
@@ -44,15 +35,17 @@ const signInSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-const signUpSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const signUpSchema = z
+  .object({
+    name: z.string().min(2, 'Name must be at least 2 characters'),
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
 
 type SignInForm = z.infer<typeof signInSchema>;
 type SignUpForm = z.infer<typeof signUpSchema>;
@@ -68,8 +61,10 @@ export default function SignIn() {
 
   // Redirect logged-in users to dashboard
   useEffect(() => {
-    if (status === 'loading') {return;} // Still loading
-    
+    if (status === 'loading') {
+      return;
+    } // Still loading
+
     if (session) {
       router.push('/dashboard');
     }
@@ -92,7 +87,7 @@ export default function SignIn() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setError('');
-    
+
     try {
       const result = await signIn('google', {
         callbackUrl: '/dashboard',
@@ -109,7 +104,7 @@ export default function SignIn() {
     } catch (error) {
       setError('An unexpected error occurred.');
       toast.error('Sign-in failed');
-      logger.error("Sign-in error: ", error)
+      logger.error('Sign-in error: ', error);
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +117,7 @@ export default function SignIn() {
     try {
       if (isSignUp) {
         const signUpData = data as SignUpForm;
-        
+
         // Create user account
         const response = await fetch('/api/auth/signup', {
           method: 'POST',
@@ -294,10 +289,7 @@ export default function SignIn() {
                     ),
                     endAdornment: (
                       <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => setShowPassword(!showPassword)}
-                          edge="end"
-                        >
+                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
                           {showPassword ? <VisibilityOff /> : <Visibility />}
                         </IconButton>
                       </InputAdornment>
@@ -352,8 +344,10 @@ export default function SignIn() {
             >
               {isLoading ? (
                 <CircularProgress size={24} color="inherit" />
+              ) : isSignUp ? (
+                'Create Account'
               ) : (
-                isSignUp ? 'Create Account' : 'Sign In'
+                'Sign In'
               )}
             </Button>
           </form>
@@ -361,11 +355,7 @@ export default function SignIn() {
           <Box sx={{ textAlign: 'center', mt: 2 }}>
             <Typography variant="body2" color="text.secondary">
               {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-              <Button
-                onClick={toggleMode}
-                sx={{ ml: 1 }}
-                disabled={isLoading}
-              >
+              <Button onClick={toggleMode} sx={{ ml: 1 }} disabled={isLoading}>
                 {isSignUp ? 'Sign In' : 'Sign Up'}
               </Button>
             </Typography>
@@ -374,4 +364,4 @@ export default function SignIn() {
       </Box>
     </Container>
   );
-} 
+}

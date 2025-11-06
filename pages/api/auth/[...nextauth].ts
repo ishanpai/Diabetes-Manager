@@ -9,10 +9,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 
 import { comparePassword } from '@/lib/auth';
-import {
-  createUser,
-  findUserByEmail,
-} from '@/lib/database';
+import { createUser, findUserByEmail } from '@/lib/database';
 import { CustomAdapter } from '@/lib/nextauth-adapter';
 import { logger } from '@/lib/logger';
 
@@ -29,7 +26,7 @@ export const authOptions: NextAuthOptions = {
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -43,7 +40,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           const isValidPassword = await comparePassword(credentials.password, user.password);
-          
+
           if (!isValidPassword) {
             return null;
           }
@@ -58,8 +55,8 @@ export const authOptions: NextAuthOptions = {
           logger.error('Auth error:', error);
           return null;
         }
-      }
-    })
+      },
+    }),
   ],
   session: {
     strategy: 'jwt',
@@ -91,7 +88,7 @@ export const authOptions: NextAuthOptions = {
         if (!user.email) {
           return false;
         }
-        
+
         // Check if user exists, if not create them
         const existingUser = await findUserByEmail(user.email);
 
@@ -105,7 +102,7 @@ export const authOptions: NextAuthOptions = {
         }
       }
       return true;
-    }
+    },
   },
   pages: {
     signIn: '/auth/signin',
@@ -114,4 +111,4 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export default NextAuth(authOptions); 
+export default NextAuth(authOptions);

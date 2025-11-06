@@ -6,10 +6,7 @@ import {
   VerificationToken,
 } from 'next-auth/adapters';
 
-import {
-  createUser,
-  findUserByEmail,
-} from './database';
+import { createUser, findUserByEmail } from './database';
 
 interface AdapterUserInput {
   id?: string;
@@ -27,17 +24,17 @@ export function CustomAdapter(): Adapter {
         email: user.email!,
         image: user.image || undefined,
       });
-      
+
       if (!createdUser) {
         throw new Error('Failed to create user');
       }
-      
+
       return {
         id: createdUser.id,
         email: createdUser.email,
         name: createdUser.name,
         image: createdUser.image,
-        emailVerified: null
+        emailVerified: null,
       } as AdapterUser;
     },
 
@@ -49,14 +46,16 @@ export function CustomAdapter(): Adapter {
 
     async getUserByEmail(email) {
       const user = await findUserByEmail(email);
-      if (!user) {return null;}
-      
+      if (!user) {
+        return null;
+      }
+
       return {
         id: user.id,
         email: user.email,
         name: user.name,
         image: user.image,
-        emailVerified: null
+        emailVerified: null,
       } as AdapterUser;
     },
 
@@ -132,4 +131,4 @@ export function CustomAdapter(): Adapter {
     //   return null;
     // }
   };
-} 
+}

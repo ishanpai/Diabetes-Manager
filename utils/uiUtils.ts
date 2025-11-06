@@ -24,7 +24,7 @@ export function formatDateTimeForInput(date: Date | string): string {
   const day = String(dateObj.getDate()).padStart(2, '0');
   const hours = String(dateObj.getHours()).padStart(2, '0');
   const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-  
+
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
@@ -58,7 +58,9 @@ export function formatRelativeTime(date: Date | string): string {
 }
 
 export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {return text;}
+  if (text.length <= maxLength) {
+    return text;
+  }
   return text.slice(0, maxLength) + '...';
 }
 
@@ -76,7 +78,7 @@ export function formatNumber(num: number, decimals: number = 0): string {
 export function getInitials(name: string): string {
   return name
     .split(' ')
-    .map(word => word.charAt(0))
+    .map((word) => word.charAt(0))
     .join('')
     .toUpperCase()
     .slice(0, 2);
@@ -93,17 +95,17 @@ export function generateAvatarColor(name: string): string {
     'bg-indigo-500',
     'bg-gray-500',
   ];
-  
+
   const hash = name.split('').reduce((acc, char) => {
     return char.charCodeAt(0) + ((acc << 5) - acc);
   }, 0);
-  
+
   return colors[Math.abs(hash) % colors.length];
 }
 
 export function debounce<TArgs extends unknown[]>(
   func: (...args: TArgs) => void,
-  wait: number
+  wait: number,
 ): (...args: TArgs) => void {
   let timeout: NodeJS.Timeout;
   return (...args: TArgs) => {
@@ -114,7 +116,7 @@ export function debounce<TArgs extends unknown[]>(
 
 export function throttle<TArgs extends unknown[]>(
   func: (...args: TArgs) => void,
-  limit: number
+  limit: number,
 ): (...args: TArgs) => void {
   let inThrottle: boolean;
   return (...args: TArgs) => {
@@ -140,16 +142,20 @@ export function isValidPassword(password: string): boolean {
 }
 
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) {return '0 Bytes';}
-  
+  if (bytes === 0) {
+    return '0 Bytes';
+  }
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-export function getEntryTypeColor(entryType: string): "primary" | "secondary" | "success" | "warning" | "error" | "info" {
+export function getEntryTypeColor(
+  entryType: string,
+): 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info' {
   switch (entryType) {
     case 'glucose':
       return 'warning';
@@ -160,4 +166,4 @@ export function getEntryTypeColor(entryType: string): "primary" | "secondary" | 
     default:
       return 'secondary';
   }
-} 
+}

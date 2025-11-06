@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
 import { logger } from '@/lib/logger';
 import { useAuth } from './useAuth';
@@ -46,7 +43,7 @@ export function useSettings() {
     } catch (err) {
       logger.error('Error loading settings:', err);
       setSettings(defaultSettings);
-      setError('Error loading settings')
+      setError('Error loading settings');
     } finally {
       setLoading(false);
     }
@@ -81,7 +78,7 @@ export function useSettings() {
       }
     } catch (err) {
       logger.error('Error saving settings:', err);
-      setError("Failed to save settings")
+      setError('Failed to save settings');
       throw new Error(err instanceof Error ? err.message : 'Failed to save settings');
     }
   };
@@ -92,4 +89,4 @@ export function useSettings() {
     error,
     updateSettings,
   };
-} 
+}

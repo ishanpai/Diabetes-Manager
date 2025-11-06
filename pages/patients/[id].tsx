@@ -18,4 +18,4 @@ export default function PatientDetailPage() {
   }
 
   return <PatientDetail patientId={id} />;
-} 
+}

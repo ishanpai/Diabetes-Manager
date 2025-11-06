@@ -1,7 +1,4 @@
-import {
-  AIRecommendationRequest,
-  AIRecommendationResponse,
-} from '@/types';
+import { AIRecommendationRequest, AIRecommendationResponse } from '@/types';
 import { logger } from './logger';
 
 const MODEL_API_KEY = process.env.MODEL_API_KEY;
@@ -29,9 +26,9 @@ interface OpenAIResponse {
 
 const buildPrompt = (request: AIRecommendationRequest): string => {
   const { currentGlucose, mealDescription, recentEntries } = request;
-  
+
   const entriesText = recentEntries
-    .map(entry => {
+    .map((entry) => {
       const date = new Date(entry.occurredAt).toLocaleString();
       switch (entry.entryType) {
         case 'glucose':
@@ -78,19 +75,20 @@ const callOpenAI = async (prompt: string): Promise<AIRecommendationResponse> => 
   const messages: OpenAIMessage[] = [
     {
       role: 'system',
-      content: 'You are a diabetes management AI assistant. Provide safe, evidence-based insulin recommendations based on patient data. Always include clear reasoning and safety warnings.'
+      content:
+        'You are a diabetes management AI assistant. Provide safe, evidence-based insulin recommendations based on patient data. Always include clear reasoning and safety warnings.',
     },
     {
       role: 'user',
-      content: prompt
-    }
+      content: prompt,
+    },
   ];
 
   const requestBody: OpenAIRequest = {
     model: MODEL_NAME,
     messages,
     temperature: 0.3,
-    max_tokens: 500
+    max_tokens: 500,
   };
 
   try {
@@ -98,9 +96,9 @@ const callOpenAI = async (prompt: string): Promise<AIRecommendationResponse> => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MODEL_API_KEY}`
+        Authorization: `Bearer ${MODEL_API_KEY}`,
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -109,7 +107,7 @@ const callOpenAI = async (prompt: string): Promise<AIRecommendationResponse> => 
 
     const data: OpenAIResponse = await response.json();
     const content = data.choices[0]?.message?.content;
-    
+
     if (!content) {
       throw new Error('No response content from OpenAI');
     }
@@ -121,48 +119,57 @@ const callOpenAI = async (prompt: string): Promise<AIRecommendationResponse> => 
         doseUnits: parsed.doseUnits,
         reasoning: parsed.reasoning,
         confidence: parsed.confidence || 0.5,
-        warnings: parsed.warnings || []
+        warnings: parsed.warnings || [],
       };
     } catch (parseError) {
       throw new Error(`Failed to parse AI response: ${parseError}`);
     }
   } catch (error) {
     logger.error('AI recommendation error:', error);
-    throw new Error(`AI recommendation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `AI recommendation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
   }
 };
 
-export const getInsulinRecommendation = async (request: AIRecommendationRequest): Promise<AIRecommendationResponse> => {
+export const getInsulinRecommendation = async (
+  request: AIRecommendationRequest,
+): Promise<AIRecommendationResponse> => {
   const prompt = buildPrompt(request);
   return callOpenAI(prompt);
 };
 
-export const validateRecommendation = (recommendation: AIRecommendationResponse, lastDose?: number): {
+export const validateRecommendation = (
+  recommendation: AIRecommendationResponse,
+  lastDose?: number,
+): {
   isValid: boolean;
   warnings: string[];
 } => {
   const warnings: string[] = [];
-  
+
   // Check dose range
   if (recommendation.doseUnits < 0 || recommendation.doseUnits > 50) {
     warnings.push('Recommended dose is outside safe range (0-50 IU)');
   }
-  
+
   // Check for significant dose changes
   if (lastDose && recommendation.doseUnits) {
     const changePercent = Math.abs((recommendation.doseUnits - lastDose) / lastDose) * 100;
     if (changePercent > 20) {
-      warnings.push(`Dose change is ${changePercent.toFixed(1)}% from last dose. Please review carefully.`);
+      warnings.push(
+        `Dose change is ${changePercent.toFixed(1)}% from last dose. Please review carefully.`,
+      );
     }
   }
-  
+
   // Check confidence level
   if (recommendation.confidence < 0.3) {
     warnings.push('Low confidence in recommendation. Please review with healthcare provider.');
   }
-  
+
   return {
     isValid: warnings.length === 0,
-    warnings
+    warnings,
   };
-}; 
+};

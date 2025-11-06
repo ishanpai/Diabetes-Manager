@@ -16,7 +16,10 @@ export const hashPassword = async (password: string): Promise<string> => {
   return bcrypt.hash(password, saltRounds);
 };
 
-export const comparePassword = async (password: string, hashedPassword: string): Promise<boolean> => {
+export const comparePassword = async (
+  password: string,
+  hashedPassword: string,
+): Promise<boolean> => {
   return bcrypt.compare(password, hashedPassword);
 };
 
@@ -25,7 +28,7 @@ export const generateToken = (user: User): string => {
     userId: user.id,
     email: user.email,
   };
-  
+
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 };
 
@@ -34,7 +37,7 @@ export const verifyToken = (token: string): JWTPayload | null => {
     const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
     return decoded;
   } catch (error) {
-    logger.error("Failed to verify token:", error)
+    logger.error('Failed to verify token:', error);
     return null;
   }
 };
@@ -43,13 +46,15 @@ export const extractTokenFromHeader = (authorization?: string): string | null =>
   if (!authorization || !authorization.startsWith('Bearer ')) {
     return null;
   }
-  
+
   return authorization.substring(7);
 };
 
 export const authenticateUser = (authorization?: string): JWTPayload | null => {
   const token = extractTokenFromHeader(authorization);
-  if (!token) {return null;}
-  
+  if (!token) {
+    return null;
+  }
+
   return verifyToken(token);
-}; 
+};
