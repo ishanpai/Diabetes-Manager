@@ -7,6 +7,7 @@ import { ErrorDisplay } from '@/components/ui/ErrorDisplay';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import { usePatients } from '@/hooks/usePatients';
+import { logger } from '@/lib/logger';
 import {
   getDiabetesTypeColor,
   getGlucoseStatusColor,
@@ -49,7 +50,7 @@ export default function Dashboard() {
       // Refresh the patients list
       refetch();
     } catch (err) {
-      console.error('Error deleting patient:', err);
+      logger.error('Error deleting patient:', err);
       alert('Failed to delete patient. Please try again.');
     }
   };

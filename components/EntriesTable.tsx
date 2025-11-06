@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { EditEntryDialog } from '@/components/dialogs/EditEntryDialog';
 import {
@@ -12,6 +9,7 @@ import {
   formatDateTime,
   getEntryTypeColor,
 } from '@/utils/uiUtils';
+import { logger } from '@/lib/logger';
 import EditIcon from '@mui/icons-material/Edit';
 import MedicationIcon from '@mui/icons-material/Medication';
 import MonitorIcon from '@mui/icons-material/Monitor';
@@ -51,7 +49,7 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
 
   const entriesPerPage = 10;
 
-  const fetchEntries = async (page: number = 0) => {
+  const fetchEntries = useCallback(async (page: number = 0) => {
     setLoading(true);
     setError(null);
 
@@ -73,16 +71,16 @@ export function EntriesTable({ patientId, patientMedications, onEntryUpdate }: E
         throw new Error(result.error || 'Failed to fetch entries');
       }
     } catch (err) {
-      console.error('Error fetching entries:', err);
+      logger.error('Error fetching entries:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
-  };
+  }, [patientId]);
 
   useEffect(() => {
-    fetchEntries(currentPage);
-  }, [patientId, currentPage]);
+    void fetchEntries(currentPage);
+  }, [fetchEntries, currentPage]);
 
   const handleEditEntry = (entry: Entry) => {
     setSelectedEntry(entry);

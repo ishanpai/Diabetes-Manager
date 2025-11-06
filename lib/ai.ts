@@ -2,6 +2,7 @@ import {
   AIRecommendationRequest,
   AIRecommendationResponse,
 } from '@/types';
+import { logger } from './logger';
 
 const MODEL_API_KEY = process.env.MODEL_API_KEY;
 const MODEL_NAME = process.env.MODEL_NAME || 'openai-4o-mini';
@@ -126,7 +127,7 @@ const callOpenAI = async (prompt: string): Promise<AIRecommendationResponse> => 
       throw new Error(`Failed to parse AI response: ${parseError}`);
     }
   } catch (error) {
-    console.error('AI recommendation error:', error);
+    logger.error('AI recommendation error:', error);
     throw new Error(`AI recommendation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };

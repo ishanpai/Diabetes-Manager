@@ -112,7 +112,7 @@ export const recommendationRequestSchema = z.object({
 // Utility validation functions
 export const validateGlucoseValue = (value: string, units: string): boolean => {
   const num = parseFloat(value);
-  if (isNaN(num)) return false;
+  if (isNaN(num)) {return false;}
   
   if (units === 'mg/dL') {
     return num >= 40 && num <= 600;
@@ -129,7 +129,7 @@ export const validateInsulinDose = (value: string): boolean => {
 };
 
 export const convertGlucoseUnits = (value: number, fromUnit: string, toUnit: string): number => {
-  if (fromUnit === toUnit) return value;
+  if (fromUnit === toUnit) {return value;}
   
   if (fromUnit === 'mg/dL' && toUnit === 'mmol/L') {
     return value / 18;

@@ -1,9 +1,7 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { PatientWithEntries } from '@/types';
+import { logger } from '@/lib/logger';
 
 interface UsePatientReturn {
   patient: PatientWithEntries | null;
@@ -19,8 +17,8 @@ export function usePatient(patientId: string): UsePatientReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPatient = async () => {
-    if (!patientId) return;
+  const fetchPatient = useCallback(async () => {
+    if (!patientId) {return;}
     
     try {
       setLoading(true);
@@ -43,15 +41,15 @@ export function usePatient(patientId: string): UsePatientReturn {
         throw new Error(result.error || 'Failed to fetch patient');
       }
     } catch (err) {
-      console.error('Error fetching patient:', err);
+      logger.error('Error fetching patient:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
-  };
+  }, [patientId]);
 
   const updatePatient = async (data: Partial<PatientWithEntries>) => {
-    if (!patientId) return;
+    if (!patientId) {return;}
     
     try {
       setLoading(true);
@@ -77,7 +75,7 @@ export function usePatient(patientId: string): UsePatientReturn {
         throw new Error(result.error || 'Failed to update patient');
       }
     } catch (err) {
-      console.error('Error updating patient:', err);
+      logger.error('Error updating patient:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       throw err;
     } finally {
@@ -86,7 +84,7 @@ export function usePatient(patientId: string): UsePatientReturn {
   };
 
   const deletePatient = async () => {
-    if (!patientId) return;
+    if (!patientId) {return;}
     
     try {
       setLoading(true);
@@ -106,7 +104,7 @@ export function usePatient(patientId: string): UsePatientReturn {
         throw new Error(result.error || 'Failed to delete patient');
       }
     } catch (err) {
-      console.error('Error deleting patient:', err);
+      logger.error('Error deleting patient:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       throw err;
     } finally {
@@ -115,8 +113,8 @@ export function usePatient(patientId: string): UsePatientReturn {
   };
 
   useEffect(() => {
-    fetchPatient();
-  }, [patientId]);
+    void fetchPatient();
+  }, [fetchPatient]);
 
   return {
     patient,

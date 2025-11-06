@@ -30,16 +30,6 @@ function Error({ statusCode, hasGetInitialPropsRun, err }: ErrorProps) {
     return 'An unexpected error occurred.';
   };
 
-  const getErrorTitle = () => {
-    if (statusCode === 404) {
-      return 'Page Not Found';
-    }
-    if (statusCode === 500) {
-      return 'Server Error';
-    }
-    return 'Something went wrong';
-  };
-
   return (
     <Box minHeight="100vh" display="flex" alignItems="center" bgcolor="#fafafa">
       <Container maxWidth="sm">

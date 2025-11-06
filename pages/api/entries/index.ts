@@ -2,7 +2,6 @@ import {
   NextApiRequest,
   NextApiResponse,
 } from 'next';
-import { getServerSession } from 'next-auth/next';
 import { z } from 'zod';
 
 import {
@@ -12,18 +11,14 @@ import {
   findEntriesByPatientIdAndType,
   findUserByEmail,
 } from '@/lib/database';
+import { logger } from '@/lib/logger';
+import { getSessionUserId } from '@/lib/utils/session';
+import type { Entry } from '@/types';
 
 import NextAuth from '../auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, NextAuth);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Access user ID from session - handle both possible structures
-  const userId = (session as any).user?.id || (session as any).user?.email;
+  const userId = await getSessionUserId(req, res, NextAuth);
 
   if (!userId) {
     return res.status(401).json({ error: 'User ID not found' });
@@ -31,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   switch (req.method) {
     case 'GET':
-      return getEntries(req, res, userId);
+      return getEntries(req, res);
     case 'POST':
       return createEntryHandler(req, res, userId);
     default:
@@ -39,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: string) {
+async function getEntries(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { patientId, limit, offset, entryType, startDate, endDate } = req.query;
 
@@ -50,8 +45,8 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
     const parsedLimit = limit ? parseInt(limit as string, 10) : 25;
     const parsedOffset = offset ? parseInt(offset as string, 10) : 0;
 
-    let entries;
-    let totalCount;
+    let entries: Entry[] = [];
+    let totalCount = 0;
 
     // If filtering by entry type, use the filtered function
     if (entryType && typeof entryType === 'string' && ['glucose', 'meal', 'insulin'].includes(entryType)) {
@@ -92,7 +87,7 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
       hasMore,
     });
   } catch (error) {
-    console.error('Error fetching entries:', error);
+    logger.error('Error fetching entries:', error);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
@@ -100,13 +95,11 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
 async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
     // If userId is an email, find the user first
-    let actualUserId = userId;
     if (userId.includes('@')) {
       const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      actualUserId = user.id;
     }
 
     // Create a validation schema
@@ -142,7 +135,7 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
       : new Date(validatedData.occurredAt);
 
     // Prepare entry data
-    const entryData: any = {
+    const entryData: Parameters<typeof createEntry>[0] = {
       entryType: validatedData.entryType,
       value: validatedData.value,
       occurredAt,
@@ -158,7 +151,7 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     }
 
     // Debug: log the entry data before creating
-    console.log('Creating entry with data:', JSON.stringify(entryData, null, 2));
+    logger.info('Creating entry with data:', JSON.stringify(entryData, null, 2));
 
     const newEntry = await createEntry(entryData);
 
@@ -184,7 +177,7 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
       message: 'Entry created successfully',
     });
   } catch (error) {
-    console.error('Error creating entry:', error);
+    logger.error('Error creating entry:', error);
 
     if (error instanceof Error) {
       return res.status(400).json({ error: error.message });

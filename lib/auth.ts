@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 import { User } from '@/types';
+import { logger } from '@/lib/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 
@@ -33,6 +34,7 @@ export const verifyToken = (token: string): JWTPayload | null => {
     const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
     return decoded;
   } catch (error) {
+    logger.error("Failed to verify token:", error)
     return null;
   }
 };
@@ -47,7 +49,7 @@ export const extractTokenFromHeader = (authorization?: string): string | null =>
 
 export const authenticateUser = (authorization?: string): JWTPayload | null => {
   const token = extractTokenFromHeader(authorization);
-  if (!token) return null;
+  if (!token) {return null;}
   
   return verifyToken(token);
 }; 

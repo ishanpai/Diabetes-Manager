@@ -37,6 +37,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { logger } from '@/lib/logger';
 
 const signInSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -67,7 +68,7 @@ export default function SignIn() {
 
   // Redirect logged-in users to dashboard
   useEffect(() => {
-    if (status === 'loading') return; // Still loading
+    if (status === 'loading') {return;} // Still loading
     
     if (session) {
       router.push('/dashboard');
@@ -108,6 +109,7 @@ export default function SignIn() {
     } catch (error) {
       setError('An unexpected error occurred.');
       toast.error('Sign-in failed');
+      logger.error("Sign-in error: ", error)
     } finally {
       setIsLoading(false);
     }

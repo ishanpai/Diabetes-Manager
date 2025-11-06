@@ -91,7 +91,7 @@ export function filterEntriesByType(entries: Entry[], type: Entry['entryType']):
 }
 
 export function getLatestEntry(entries: Entry[]): Entry | null {
-  if (entries.length === 0) return null;
+  if (entries.length === 0) {return null;}
   return sortEntriesByDate(entries)[0];
 }
 

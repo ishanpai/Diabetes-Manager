@@ -2,7 +2,6 @@ import {
   NextApiRequest,
   NextApiResponse,
 } from 'next';
-import { getServerSession } from 'next-auth/next';
 import { z } from 'zod';
 
 import {
@@ -12,18 +11,13 @@ import {
   findUserByEmail,
   updateEntry,
 } from '@/lib/database';
+import { logger } from '@/lib/logger';
+import { getSessionUserId } from '@/lib/utils/session';
 
 import NextAuth from '../auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, NextAuth);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Access user ID from session - handle both possible structures
-  const userId = (session as any).user?.id || (session as any).user?.email;
+  const userId = await getSessionUserId(req, res, NextAuth);
 
   if (!userId) {
     return res.status(401).json({ error: 'User ID not found' });
@@ -87,7 +81,7 @@ async function getEntry(req: NextApiRequest, res: NextApiResponse, userId: strin
       data: transformedEntry,
     });
   } catch (error) {
-    console.error('Error fetching entry:', error);
+    logger.error('Error fetching entry:', error);
     res.status(500).json({ error: 'Failed to fetch entry' });
   }
 }
@@ -145,8 +139,7 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
       : new Date(validatedData.occurredAt);
 
     // Prepare update data
-    const updateData: any = {
-      entryType: validatedData.entryType,
+    const updateData: Parameters<typeof updateEntry>[1] = {
       value: validatedData.value,
       occurredAt,
     };
@@ -182,7 +175,7 @@ async function updateEntryHandler(req: NextApiRequest, res: NextApiResponse, use
       message: 'Entry updated successfully',
     });
   } catch (error) {
-    console.error('Error updating entry:', error);
+    logger.error('Error updating entry:', error);
 
     if (error instanceof Error) {
       return res.status(400).json({ error: error.message });
@@ -226,7 +219,7 @@ async function deleteEntryHandler(req: NextApiRequest, res: NextApiResponse, use
       message: 'Entry deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting entry:', error);
+    logger.error('Error deleting entry:', error);
     res.status(500).json({ error: 'Failed to delete entry' });
   }
-} 
+}

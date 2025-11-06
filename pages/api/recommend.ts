@@ -2,7 +2,6 @@ import {
   NextApiRequest,
   NextApiResponse,
 } from 'next';
-import { getServerSession } from 'next-auth/next';
 import { z } from 'zod';
 
 import { GLUCOSE_TARGET_RANGES } from '@/lib/config';
@@ -12,11 +11,20 @@ import {
   findPatientById,
   findUserByEmail,
 } from '@/lib/database';
+import { logger } from '@/lib/logger';
+import { getSessionUserId } from '@/lib/utils/session';
+import type {
+  Entry,
+  Medication,
+  Patient,
+  Recommendation,
+} from '@/types';
+import OpenAI from 'openai';
 
 import NextAuth from './auth/[...nextauth]';
 
 // Initialize OpenAI client
-const openai = new (require('openai')).default({
+const openai = new OpenAI({
   apiKey: process.env.MODEL_API_KEY,
 });
 
@@ -25,6 +33,22 @@ const recommendSchema = z.object({
   targetTime: z.string().optional(), // ISO string for target time
   timezone: z.string().optional(),
 });
+
+type RecommendationPayload = Recommendation & { targetTime?: Date };
+
+type SSEMessage =
+  | { type: 'progress'; step: string; message?: string }
+  | { type: 'error'; error: string }
+  | { type: 'result'; data: RecommendationPayload };
+
+type AIRecommendationResult = Pick<
+  Recommendation,
+  'doseUnits' | 'medicationName' | 'reasoning' | 'safetyNotes' | 'confidence' | 'recommendedMonitoring'
+>;
+
+type PromptPatient = Patient & {
+  usualMedications?: Medication[] | string | null;
+};
 
 // Utility function to format date in local time
 function formatLocalTime(date: Date, timeZone: string = 'UTC'): string {
@@ -41,14 +65,7 @@ function formatLocalTime(date: Date, timeZone: string = 'UTC'): string {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, NextAuth);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Access user ID from session - handle both possible structures
-  const userId = (session as any).user?.id || (session as any).user?.email;
+  const userId = await getSessionUserId(req, res, NextAuth);
 
   if (!userId) {
     return res.status(401).json({ error: 'User ID not found' });
@@ -64,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 async function createRecommendationHandler(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
     // Debug: log the incoming request body
-    console.log('Incoming /api/recommend request body:', req.body);
+    logger.debug('Incoming /api/recommend request body:', req.body);
     
     // Set up SSE headers for streaming
     res.writeHead(200, {
@@ -76,16 +93,19 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     });
 
     const sendProgress = (step: string, message?: string) => {
-      res.write(`data: ${JSON.stringify({ type: 'progress', step, message })}\n\n`);
+      const payload: SSEMessage = { type: 'progress', step, message };
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
     };
 
     const sendError = (error: string) => {
-      res.write(`data: ${JSON.stringify({ type: 'error', error })}\n\n`);
+      const payload: SSEMessage = { type: 'error', error };
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
       res.end();
     };
 
-    const sendResult = (data: any) => {
-      res.write(`data: ${JSON.stringify({ type: 'result', data })}\n\n`);
+    const sendResult = (data: RecommendationPayload) => {
+      const message: SSEMessage = { type: 'result', data };
+      res.write(`data: ${JSON.stringify(message)}\n\n`);
       res.end();
     };
     
@@ -104,17 +124,17 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     try {
       validatedData = recommendSchema.parse(req.body);
     } catch (validationError) {
-      console.error('Validation error in /api/recommend:', validationError);
+      logger.error('Validation error in /api/recommend:', validationError);
       return sendError('Validation failed');
     }
 
     const { patientId, targetTime, timezone } = validatedData;
     const userTimezone = timezone || 'UTC';
-    console.log('Validated data:', { patientId, targetTime, timezone });
+    logger.debug('Validated data:', { patientId, targetTime, timezone });
 
     // Parse target time if provided
     const targetDateTime = targetTime ? new Date(targetTime) : new Date();
-    console.log('Target datetime:', targetDateTime);
+    logger.debug('Target datetime:', targetDateTime);
 
     // Check authentication and send progress
     sendProgress('gathering-data', 'Checking authentication...');
@@ -139,7 +159,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     const recentEntries = entries.filter(entry => 
       new Date(entry.occurredAt) >= new Date(Date.now() - 72 * 60 * 60 * 1000)
     );
-    console.log('Recent entries count:', recentEntries.length);
+    logger.debug('Recent entries count:', recentEntries.length);
     sendProgress('gathering-data', `Found ${recentEntries.length} recent entries`);
 
     // Check if patient has sufficient history for recommendations
@@ -158,7 +178,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     // Call OpenAI API for recommendation
     sendProgress('waiting-for-model', 'Calling AI model...');
     const aiRecommendation = await getAIRecommendation(prompt);
-    console.log('AI recommendation received:', aiRecommendation);
+    logger.debug('AI recommendation received:', aiRecommendation);
     sendProgress('waiting-for-model', 'AI response received');
     await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -168,7 +188,7 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
     const savedRecommendation = await createRecommendation({
       patientId,
       prompt,
-      response: aiRecommendation.reasoning,
+      response: aiRecommendation.reasoning ?? 'No reasoning provided',
       doseUnits: aiRecommendation.doseUnits,
       medicationName: aiRecommendation.medicationName,
       reasoning: aiRecommendation.reasoning,
@@ -181,13 +201,15 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
       return sendError('Failed to save recommendation');
     }
 
-    console.log('Recommendation saved to database');
+    logger.info('Recommendation saved to database');
     sendProgress('parsing-response', 'Recommendation saved');
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const result = {
+    const result: RecommendationPayload = {
       id: savedRecommendation.id,
       patientId: savedRecommendation.patientId,
+      prompt: savedRecommendation.prompt,
+      response: savedRecommendation.response,
       doseUnits: savedRecommendation.doseUnits,
       medicationName: savedRecommendation.medicationName,
       reasoning: savedRecommendation.reasoning,
@@ -200,8 +222,8 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
 
     sendResult(result);
   } catch (error) {
-    console.error('Recommendation error:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    logger.error('Recommendation error:', error);
+    logger.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     if (error instanceof z.ZodError) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Invalid request data', details: error.errors })}\n\n`);
@@ -212,19 +234,24 @@ async function createRecommendationHandler(req: NextApiRequest, res: NextApiResp
   }
 }
 
-function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Date, timeZone: string) {
+function buildRecommendationPrompt(
+  patient: PromptPatient,
+  entries: Entry[],
+  targetTime: Date,
+  timeZone: string,
+) {
   // Handle usualMedications - it could be a JSON string or already an object/array
-  let medications = [];
+  let medications: Medication[] = [];
   try {
     if (typeof patient.usualMedications === 'string') {
-      medications = JSON.parse(patient.usualMedications || '[]');
+      medications = JSON.parse(patient.usualMedications || '[]') as Medication[];
     } else if (Array.isArray(patient.usualMedications)) {
       medications = patient.usualMedications;
     } else {
       medications = [];
     }
   } catch (error) {
-    console.error('Error parsing usualMedications:', error);
+    logger.error('Error parsing usualMedications:', error);
     medications = [];
   }
 
@@ -232,7 +259,7 @@ function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Dat
   const age = Math.floor((new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
 
   // Analyze medication timing patterns from recent history
-  const insulinEntries = entries.filter(entry => entry.entryType === 'insulin');
+  const insulinEntries = entries.filter((entry) => entry.entryType === 'insulin');
   const medicationPatterns = analyzeMedicationPatterns(insulinEntries, targetTime, timeZone);
 
   const patientInfo = `
@@ -242,7 +269,7 @@ function buildRecommendationPrompt(patient: any, entries: any[], targetTime: Dat
 - Diabetes Type: ${patient.diabetesType}
 - Lifestyle: ${patient.lifestyle || 'Not specified'}
 - Activity Level: ${patient.activityLevel || 'Not specified'}
-- Usual Medications: ${medications.map((med: any) => `${med.brand} ${med.dosage} (${med.timing})`).join(', ')}
+- Usual Medications: ${medications.map((med: Medication) => `${med.brand} ${med.dosage} (${med.timing})`).join(', ')}
 </PATIENT_INFO>
 `;
 
@@ -400,12 +427,20 @@ Remember: This is a medical recommendation that should be reviewed by healthcare
 `;
 }
 
-function analyzeMedicationPatterns(insulinEntries: any[], targetTime: Date, timeZone: string) {
+function analyzeMedicationPatterns(insulinEntries: Entry[], _targetTime: Date, timeZone: string) {
   if (insulinEntries.length === 0) {
     return "No recent insulin administration patterns available.";
   }
 
   // Group entries by time of day using the user's timezone
+  const normalizeBrand = (brand?: string | null): string | null => {
+    if (!brand) {
+      return null;
+    }
+    const trimmed = brand.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+
   const morningEntries = insulinEntries.filter(entry => {
     const hour = Number(new Date(entry.occurredAt).toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone }));
     return hour >= 6 && hour < 12;
@@ -421,10 +456,12 @@ function analyzeMedicationPatterns(insulinEntries: any[], targetTime: Date, time
     return hour >= 18 || hour < 6;
   });
 
-  let patterns = [];
+  const patterns = [];
   
   if (morningEntries.length > 0) {
-    const morningMeds = morningEntries.map(e => e.medicationBrand).filter(Boolean);
+    const morningMeds = morningEntries
+      .map(e => normalizeBrand(e.medicationBrand))
+      .filter((brand): brand is string => Boolean(brand));
     const mostCommonMorning = getMostCommon(morningMeds);
     if (mostCommonMorning) {
       patterns.push(`Morning (6 AM - 12 PM): Primarily uses ${mostCommonMorning} (${morningEntries.length} entries)`);
@@ -432,7 +469,9 @@ function analyzeMedicationPatterns(insulinEntries: any[], targetTime: Date, time
   }
   
   if (afternoonEntries.length > 0) {
-    const afternoonMeds = afternoonEntries.map(e => e.medicationBrand).filter(Boolean);
+    const afternoonMeds = afternoonEntries
+      .map(e => normalizeBrand(e.medicationBrand))
+      .filter((brand): brand is string => Boolean(brand));
     const mostCommonAfternoon = getMostCommon(afternoonMeds);
     if (mostCommonAfternoon) {
       patterns.push(`Afternoon (12 PM - 6 PM): Primarily uses ${mostCommonAfternoon} (${afternoonEntries.length} entries)`);
@@ -440,7 +479,9 @@ function analyzeMedicationPatterns(insulinEntries: any[], targetTime: Date, time
   }
   
   if (eveningEntries.length > 0) {
-    const eveningMeds = eveningEntries.map(e => e.medicationBrand).filter(Boolean);
+    const eveningMeds = eveningEntries
+      .map(e => normalizeBrand(e.medicationBrand))
+      .filter((brand): brand is string => Boolean(brand));
     const mostCommonEvening = getMostCommon(eveningMeds);
     if (mostCommonEvening) {
       patterns.push(`Evening/Night (6 PM - 6 AM): Primarily uses ${mostCommonEvening} (${eveningEntries.length} entries)`);
@@ -457,8 +498,8 @@ function analyzeMedicationPatterns(insulinEntries: any[], targetTime: Date, time
   return patterns.length > 0 ? patterns.join('\n') : "Limited pattern data available.";
 }
 
-function getMostCommon(arr: string[]): string | null {
-  if (arr.length === 0) return null;
+function getMostCommon(arr: (string)[]): string | null {
+  if (arr.length === 0) {return null;}
   
   const counts: { [key: string]: number } = {};
   arr.forEach(item => {
@@ -468,9 +509,9 @@ function getMostCommon(arr: string[]): string | null {
   return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
 }
 
-async function getAIRecommendation(prompt: string) {
+async function getAIRecommendation(prompt: string): Promise<AIRecommendationResult> {
   try {
-    console.log('Calling OpenAI API...');
+    logger.debug('Calling OpenAI API...');
     
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -489,29 +530,31 @@ async function getAIRecommendation(prompt: string) {
       response_format: { type: "json_object" }, // Ensure JSON response
     });
 
-    console.log('OpenAI response received');
+    logger.debug('OpenAI response received');
     
     const responseContent = completion.choices[0]?.message?.content;
     if (!responseContent) {
       throw new Error('No response content from OpenAI');
     }
 
-    console.log('Raw AI response:', responseContent);
+    logger.debug('Raw AI response:', responseContent);
 
     // Parse JSON response
     try {
-      const parsed = JSON.parse(responseContent);
+      const parsed = JSON.parse(responseContent) as Record<string, unknown>;
       return {
-        doseUnits: parsed.doseUnits || 8,
-        medicationName: parsed.medicationName || 'Unknown',
-        reasoning: parsed.reasoning || 'No reasoning provided',
-        safetyNotes: parsed.safetyNotes || '',
-        confidence: parsed.confidence || 'medium',
-        recommendedMonitoring: parsed.recommendedMonitoring || '',
+        doseUnits: typeof parsed.doseUnits === 'number' ? parsed.doseUnits : undefined,
+        medicationName: typeof parsed.medicationName === 'string' ? parsed.medicationName : undefined,
+        reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : undefined,
+        safetyNotes: typeof parsed.safetyNotes === 'string' ? parsed.safetyNotes : undefined,
+        confidence: normalizeConfidence(parsed.confidence),
+        recommendedMonitoring: typeof parsed.recommendedMonitoring === 'string'
+          ? parsed.recommendedMonitoring
+          : undefined,
       };
     } catch (parseError) {
-      console.error('Error parsing JSON from AI response:', parseError);
-      console.error('Response content:', responseContent);
+      logger.error('Error parsing JSON from AI response:', parseError);
+      logger.error('Response content:', responseContent);
       
       // Fallback: extract dose and reasoning from text
       const doseMatch = responseContent.match(/"doseUnits"\s*:\s*(\d+(?:\.\d+)?)/);
@@ -528,10 +571,10 @@ async function getAIRecommendation(prompt: string) {
     }
 
   } catch (error) {
-    console.error('OpenAI API error:', error);
+    logger.error('OpenAI API error:', error);
     
     // Fallback to mock recommendation if OpenAI fails
-    console.log('Falling back to mock recommendation');
+    logger.warn('Falling back to mock recommendation');
     return {
       doseUnits: 8,
       reasoning: `Unable to get AI recommendation due to technical issues. Please consult with your healthcare provider for insulin dosing guidance. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -542,7 +585,20 @@ async function getAIRecommendation(prompt: string) {
   }
 }
 
-function checkSufficientHistory(entries: any[]): { hasSufficientHistory: boolean; message: string } {
+function normalizeConfidence(confidence: unknown): Recommendation['confidence'] | undefined {
+  if (confidence === 'high' || confidence === 'medium' || confidence === 'low') {
+    return confidence;
+  }
+  if (typeof confidence === 'string') {
+    const lowered = confidence.toLowerCase();
+    if (lowered === 'high' || lowered === 'medium' || lowered === 'low') {
+      return lowered as Recommendation['confidence'];
+    }
+  }
+  return undefined;
+}
+
+function checkSufficientHistory(entries: Entry[]): { hasSufficientHistory: boolean; message: string } {
   const totalEntries = entries.length;
   
   if (totalEntries === 0) {

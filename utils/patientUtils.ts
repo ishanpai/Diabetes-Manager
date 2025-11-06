@@ -6,8 +6,8 @@ import {
 } from '@/types';
 
 export function getGlucoseStatus(value: number): 'low' | 'normal' | 'high' {
-  if (value < 70) return 'low';
-  if (value > 180) return 'high';
+  if (value < 70) {return 'low';}
+  if (value > 180) {return 'high';}
   return 'normal';
 }
 
@@ -24,7 +24,7 @@ export function getGlucoseStatusColor(status: 'low' | 'normal' | 'high'): 'error
   }
 }
 
-export function getDiabetesTypeColor(type: string): 'primary' | 'secondary' | 'info' | 'default' | 'error' | 'warning' | 'success' {
+export function getDiabetesTypeColor(_type: string): 'primary' | 'secondary' | 'info' | 'default' | 'error' | 'warning' | 'success' {
   return 'default';
 }
 
@@ -68,7 +68,7 @@ export function formatMedications(patient: Patient | PatientWithStats): string {
 }
 
 export function hasSufficientHistoryForRecommendations(entries: Entry[]): boolean {
-  if (entries.length === 0) return false;
+  if (entries.length === 0) {return false;}
   
   // Check if we have entries from at least 1 day ago
   const oneDayAgo = new Date();

@@ -8,7 +8,7 @@ export function useAuth(redirectTo?: string) {
   const router = useRouter();
 
   useEffect(() => {
-    if (status === 'loading') return;
+    if (status === 'loading') {return;}
     
     if (!session) {
       router.push(redirectTo || '/auth/signin');

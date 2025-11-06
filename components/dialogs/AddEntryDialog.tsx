@@ -4,7 +4,7 @@ import {
   EntryForm,
   EntryFormValues,
 } from '@/components/EntryForm';
-import { Entry } from '@/types';
+import { Entry, Medication } from '@/types';
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,8 @@ interface AddEntryDialogProps {
   onClose: () => void;
   entryType: 'glucose' | 'meal' | 'insulin';
   patientId: string;
-  patientMedications?: Array<{ brand: string; dosage: string; timing?: string }>;
-  defaultValues?: any;
+  patientMedications?: Medication[];
+  defaultValues?: Partial<EntryFormValues>;
   onSuccess?: (entry: Entry) => void;
 }
 
@@ -32,19 +32,6 @@ export function AddEntryDialog({
 }: AddEntryDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const getDialogTitle = () => {
-    switch (entryType) {
-      case 'glucose':
-        return 'Add Glucose Reading';
-      case 'meal':
-        return 'Add Meal';
-      case 'insulin':
-        return 'Add Insulin Dose';
-      default:
-        return 'Add Entry';
-    }
-  };
 
   const handleSubmit = async (data: EntryFormValues) => {
     setLoading(true);

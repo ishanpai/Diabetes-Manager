@@ -4,6 +4,7 @@ import {
 } from 'react';
 
 import { PatientWithStats } from '@/types';
+import { logger } from '@/lib/logger';
 
 interface UsePatientsReturn {
   patients: PatientWithStats[];
@@ -39,7 +40,7 @@ export function usePatients(): UsePatientsReturn {
         throw new Error(result.error || 'Failed to fetch patients');
       }
     } catch (err) {
-      console.error('Error fetching patients:', err);
+      logger.error('Error fetching patients:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       setPatients([]); // Set empty array on error
     } finally {

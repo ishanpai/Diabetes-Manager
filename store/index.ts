@@ -10,6 +10,7 @@ import {
   RecommendationProgress,
   User,
 } from '@/types';
+import { logger } from '@/lib/logger';
 
 interface AppStore extends AppState {
   // Actions
@@ -50,7 +51,7 @@ const initialState: AppState = {
 
 export const useAppStore = create<AppStore>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       ...initialState,
 
       setUser: (user) => set({ user }),
@@ -136,7 +137,7 @@ export const usePatientEntries = (patientId?: string) => {
   const currentPatient = useCurrentPatient();
   const targetPatientId = patientId || currentPatient?.id;
 
-  console.log("Entries:", entries);
+  logger.debug('Entries selector result:', entries);
   
   return targetPatientId ? entries.filter(entry => entry.patientId === targetPatientId) : [];
 };

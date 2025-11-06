@@ -2,20 +2,19 @@ import {
   NextApiRequest,
   NextApiResponse,
 } from 'next';
-import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 
 import {
   findUserSettingsByUserId,
   upsertUserSettings,
 } from '@/lib/database';
+import { logger } from '@/lib/logger';
+import { getSessionUserId } from '@/lib/utils/session';
 
 import { authOptions } from './auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-
-  const userId = (session as any).user?.id || (session as any).user?.email;
+  const userId = await getSessionUserId(req, res, authOptions);
 
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -47,7 +46,7 @@ async function getSettings(req: NextApiRequest, res: NextApiResponse, userId: st
       } : defaultSettings,
     });
   } catch (error) {
-    console.error('Error fetching settings:', error);
+    logger.error('Error fetching settings:', error);
     res.status(500).json({ error: 'Failed to fetch settings' });
   }
 }
@@ -76,7 +75,7 @@ async function updateSettings(req: NextApiRequest, res: NextApiResponse, userId:
       message: 'Settings updated successfully',
     });
   } catch (error) {
-    console.error('Error updating settings:', error);
+    logger.error('Error updating settings:', error);
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid settings data' });

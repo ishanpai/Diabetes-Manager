@@ -59,7 +59,10 @@ export function SettingsForm() {
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
+  const handleInputChange = <K extends keyof typeof formData>(
+    field: K,
+    value: (typeof formData)[K],
+  ) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -109,7 +112,9 @@ export function SettingsForm() {
                 <InputLabel>Glucose Units</InputLabel>
                 <Select
                   value={formData.glucoseUnits}
-                  onChange={(e) => handleInputChange('glucoseUnits', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange('glucoseUnits', e.target.value as typeof formData.glucoseUnits)
+                  }
                   label="Glucose Units"
                 >
                   <MenuItem value="mg/dL">mg/dL (US Standard)</MenuItem>

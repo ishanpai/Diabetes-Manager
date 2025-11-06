@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -16,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorDisplay } from '@/components/ui/ErrorDisplay';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { usePatient } from '@/hooks/usePatient';
+import type { EntryFormValues } from '@/components/EntryForm';
 import {
   Entry,
   Recommendation,
@@ -26,6 +24,7 @@ import {
   getHistoryRequirementStatus,
 } from '@/utils/patientUtils';
 import { formatDate } from '@/utils/uiUtils';
+import { logger } from '@/lib/logger';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import InfoIcon from '@mui/icons-material/Info';
@@ -59,11 +58,11 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
   // Dialog state
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [entryType, setEntryType] = useState<'glucose' | 'meal' | 'insulin'>('glucose');
-  const [entryDefaultValues, setEntryDefaultValues] = useState<any>(undefined);
+  const [entryDefaultValues, setEntryDefaultValues] = useState<Partial<EntryFormValues> | undefined>(undefined);
   const [recommendationDialogOpen, setRecommendationDialogOpen] = useState(false);
 
   // Fetch entries for the patient
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     setEntriesLoading(true);
     try {
       const response = await fetch(`/api/entries?patientId=${patientId}&limit=1000&offset=0`);
@@ -79,19 +78,19 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
         throw new Error(result.error || 'Failed to fetch entries');
       }
     } catch (err) {
-      console.error('Error fetching entries:', err);
+      logger.error('Error fetching entries:', err);
       setEntries([]);
     } finally {
       setEntriesLoading(false);
     }
-  };
+  }, [patientId]);
 
   // Fetch entries when patientId changes
   useEffect(() => {
     if (patientId) {
-      fetchEntries();
+      void fetchEntries();
     }
-  }, [patientId]);
+  }, [fetchEntries, patientId]);
 
   const handleDeletePatient = async () => {
     if (!confirm('Are you sure you want to delete this patient? This action cannot be undone.')) {
@@ -110,7 +109,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
       // Redirect to dashboard after deletion
       router.push('/dashboard');
     } catch (err) {
-      console.error('Error deleting patient:', err);
+      logger.error('Error deleting patient:', err);
       alert('Failed to delete patient. Please try again.');
     }
   };
@@ -129,19 +128,21 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
     setRecommendationDialogOpen(true);
   };
 
-  const handleEntrySuccess = (entry: Entry) => {
+  const handleEntrySuccess = (_entry: Entry) => {
     // Refresh patient data and entries to show new entry
     refetch();
-    fetchEntries();
+    void fetchEntries();
   };
 
   const handleRecommendationSuccess = (recommendation: Recommendation) => {
     // Optionally refresh data or show success message
-    console.log('Recommendation created:', recommendation);
+    logger.info('Recommendation created:', recommendation);
   };
 
-  const handleAddEntryFromRecommendation = (entryType: 'insulin', defaultValues: any) => {
-
+  const handleAddEntryFromRecommendation = (
+    entryType: 'insulin',
+    defaultValues: Partial<EntryFormValues>,
+  ) => {
     if (!patient) {
       alert("Patient not found");
       return;
@@ -150,7 +151,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
     setEntryType(entryType);
 
     // If no medication brand is provided, use the first available insulin medication
-    let finalDefaultValues = { ...defaultValues };
+    const finalDefaultValues: Partial<EntryFormValues> = { ...defaultValues };
     if (entryType === 'insulin' && !defaultValues.medicationBrand && patient.usualMedications?.length > 0) {
       // Find the first insulin medication (assuming all medications in the list are insulin)
       const firstMedication = patient.usualMedications[0];
@@ -164,7 +165,7 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
   const handleEntryUpdate = () => {
     // Refresh patient data and entries when entries are updated
     refetch();
-    fetchEntries();
+    void fetchEntries();
   };
 
   if (loading) {
@@ -390,7 +391,6 @@ export function PatientDetail({ patientId, showHeader = true, showActions = true
         <Grid item xs={12}>
           <Box mt={2}>
             <GlucoseChart
-              patientId={patientId}
               entries={entries}
               loading={entriesLoading}
               error={null}

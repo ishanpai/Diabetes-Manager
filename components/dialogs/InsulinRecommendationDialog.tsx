@@ -11,6 +11,8 @@ import {
   Recommendation,
   RecommendationProgress,
 } from '@/types';
+import type { EntryFormValues } from '@/components/EntryForm';
+import { logger } from '@/lib/logger';
 import { formatDateTimeForInput } from '@/utils/uiUtils';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -39,7 +41,7 @@ interface InsulinRecommendationDialogProps {
   patientId: string;
   patientName: string;
   onSuccess?: (recommendation: Recommendation) => void;
-  onAddEntry?: (entryType: 'insulin', defaultValues: any) => void;
+  onAddEntry?: (entryType: 'insulin', defaultValues: Partial<EntryFormValues>) => void;
 }
 
 export function InsulinRecommendationDialog({
@@ -54,7 +56,7 @@ export function InsulinRecommendationDialog({
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showWarning, setShowWarning] = useState(false);
-  const [lastDose, setLastDose] = useState<number | null>(null);
+  const [lastDose] = useState<number | null>(null);
   const [targetTime, setTargetTime] = useState<Date>(() => {
     // Default to current time + 5 minutes
     const now = new Date();
@@ -77,7 +79,7 @@ export function InsulinRecommendationDialog({
 
   // Debug progress changes
   useEffect(() => {
-    console.log('Progress state changed to:', progress);
+    logger.debug('Progress state changed to:', progress);
   }, [progress]);
 
   const startRecommendation = async () => {
@@ -113,11 +115,15 @@ export function InsulinRecommendationDialog({
       }
 
       let buffer = '';
+      let doneReading = false;
 
-      while (true) {
+      while (!doneReading) {
         const { done, value } = await reader.read();
         
-        if (done) break;
+        if (done) {
+          doneReading = true;
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -129,23 +135,23 @@ export function InsulinRecommendationDialog({
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              console.log('Received SSE data:', data);
+              logger.debug('Received SSE data:', data);
               
               switch (data.type) {
                 case 'progress':
-                  console.log('Progress update:', data.step, data.message);
+                  logger.debug('Progress update:', data.step, data.message);
                   setProgress(data.step as RecommendationProgress);
                   // Force a small delay to make progress visible
                   await new Promise(resolve => setTimeout(resolve, 100));
                   break;
                 case 'error':
-                  console.log('Error received:', data.error);
+                  logger.debug('Error received:', data.error);
                   setError(data.error);
                   setProgress('error');
                   return;
-                case 'result':
-                  console.log('Result received:', data.data);
-                  const newRecommendation = data.data;
+                case 'result': {
+                  logger.debug('Result received:', data.data);
+                  const newRecommendation = data.data as Recommendation;
                   
                   // Check for dose difference warning (20% threshold)
                   if (newRecommendation.doseUnits && lastDose) {
@@ -159,15 +165,16 @@ export function InsulinRecommendationDialog({
                   setProgress('complete');
                   onSuccess?.(newRecommendation);
                   return;
+                }
               }
             } catch (parseError) {
-              console.error('Error parsing SSE data:', parseError, 'Line:', line);
+              logger.error('Error parsing SSE data:', parseError, 'Line:', line);
             }
           }
         }
       }
     } catch (err) {
-      console.error('Recommendation error:', err);
+      logger.error('Recommendation error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       setProgress('error');
     }
@@ -183,18 +190,18 @@ export function InsulinRecommendationDialog({
 
   const getProgressLabel = () => {
     const currentStep = PROGRESS_STEPS.find(step => step.key === progress);
-    console.log('Current progress:', progress, 'Label:', currentStep?.label);
+    logger.debug('Current progress:', progress, 'Label:', currentStep?.label);
     return currentStep?.label || 'Processing...';
   };
 
   const getProgressValue = () => {
-    if (progress === 'idle') return 0;
-    if (progress === 'error') return 0;
-    if (progress === 'complete') return 100;
+    if (progress === 'idle') {return 0;}
+    if (progress === 'error') {return 0;}
+    if (progress === 'complete') {return 100;}
     
     const currentIndex = PROGRESS_STEPS.findIndex(step => step.key === progress);
     const value = ((currentIndex + 1) / PROGRESS_STEPS.length) * 100;
-    console.log('Progress value:', progress, 'Index:', currentIndex, 'Value:', value);
+    logger.debug('Progress value:', progress, 'Index:', currentIndex, 'Value:', value);
     return value;
   };
 

@@ -1,11 +1,8 @@
-import { useEffect } from 'react';
-
 import { SessionProvider } from 'next-auth/react';
 import type { AppProps } from 'next/app';
 import { Toaster } from 'react-hot-toast';
 
 import Layout from '@/components/Layout';
-import { useAppStore } from '@/store';
 import CssBaseline from '@mui/material/CssBaseline';
 import {
   createTheme,
@@ -70,14 +67,6 @@ const theme = createTheme({
 });
 
 export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
-  const { setUser, setCurrentPatient, setPatients } = useAppStore();
-
-  // Initialize app state from localStorage on mount
-  useEffect(() => {
-    // This will be handled by Zustand persist middleware
-    // Additional initialization can be added here if needed
-  }, []);
-
   return (
     <SessionProvider session={session}>
       <ThemeProvider theme={theme}>

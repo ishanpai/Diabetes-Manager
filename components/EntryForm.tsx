@@ -1,16 +1,18 @@
-import React, {
-  useEffect,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import {
   Controller,
   useForm,
 } from 'react-hook-form';
 import { z } from 'zod';
+import Link from 'next/link';
 
 import { useSettings } from '@/hooks/useSettings';
-import { Medication } from '@/types';
+import { logger } from '@/lib/logger';
+import {
+  Entry,
+  Medication,
+} from '@/types';
 import { formatDateTimeForInput } from '@/utils/uiUtils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import HistoryIcon from '@mui/icons-material/History';
@@ -145,19 +147,10 @@ export function EntryForm({
       });
   }, [defaultValues, entryType, reset, settings?.glucoseUnits]);
 
-  // Fetch past meals when the time changes
-  useEffect(() => {
-    if (entryType === 'meal' && patientId && watchedOccurredAt) {
-      fetchPastMeals();
+  const fetchPastMeals = useCallback(async () => {
+    if (entryType !== 'meal' || !patientId || !watchedOccurredAt) {
+      return;
     }
-  }, [entryType, patientId, watchedOccurredAt]);
-
-  const handleFormSubmit = async (data: EntryFormValues) => {
-    await onSubmit(data);
-  };
-
-  const fetchPastMeals = async () => {
-    if (!patientId || !watchedOccurredAt) return;
     
     setFetchingPreviousMeals(true);
     try {
@@ -175,7 +168,8 @@ export function EntryForm({
         const result = await response.json();
         if (result.success && result.data.length > 0) {
           // Process and sort meals by relevance to entered time
-          const processedMeals: PastMeal[] = result.data.map((meal: any) => {
+          const mealEntries = result.data as Array<Pick<Entry, 'id' | 'value' | 'occurredAt'>>;
+          const processedMeals: PastMeal[] = mealEntries.map((meal) => {
             const mealDate = new Date(meal.occurredAt);
             const mealTimeMinutes = mealDate.getHours() * 60 + mealDate.getMinutes();
             const timeDiff = Math.abs(mealTimeMinutes - enteredTimeMinutes);
@@ -183,7 +177,7 @@ export function EntryForm({
             return {
               id: meal.id,
               value: meal.value,
-              occurredAt: meal.occurredAt,
+              occurredAt: mealDate.toISOString(),
               date: mealDate.toLocaleDateString(),
               time: mealDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               timeDiff,
@@ -205,11 +199,22 @@ export function EntryForm({
         }
       }
     } catch (error) {
-      console.error('Error fetching past meals:', error);
+      logger.error('Error fetching past meals:', error);
       setPastMeals([]);
     } finally {
       setFetchingPreviousMeals(false);
     }
+  }, [entryType, patientId, watchedOccurredAt]);
+
+  // Fetch past meals when the time changes
+  useEffect(() => {
+    if (entryType === 'meal' && patientId && watchedOccurredAt) {
+      void fetchPastMeals();
+    }
+  }, [entryType, fetchPastMeals, patientId, watchedOccurredAt]);
+
+  const handleFormSubmit = async (data: EntryFormValues) => {
+    await onSubmit(data);
   };
 
   const handlePastMealSelect = (mealId: string) => {
@@ -277,7 +282,10 @@ export function EntryForm({
                   <MenuItem value="mmol/L">mmol/L</MenuItem>
                 </Select>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                  Units are set in your <a href="/settings" style={{ color: 'inherit', textDecoration: 'underline' }}>settings</a>
+                  Units are set in your{' '}
+                  <Link href="/settings" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                    settings
+                  </Link>
                 </Typography>
               </FormControl>
             )}

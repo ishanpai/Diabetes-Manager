@@ -10,9 +10,14 @@ import {
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
+  TooltipProps,
   XAxis,
   YAxis,
 } from 'recharts';
+import type {
+  NameType,
+  ValueType,
+} from 'recharts/types/component/DefaultTooltipContent';
 
 import { useSettings } from '@/hooks/useSettings';
 import { GLUCOSE_TARGET_RANGES } from '@/lib/config';
@@ -28,7 +33,6 @@ import {
 } from '@mui/material';
 
 interface GlucoseChartProps {
-  patientId: string;
   entries?: Entry[];
   loading?: boolean;
   error?: string | null;
@@ -43,7 +47,7 @@ interface ChartDataPoint {
   entryId: string;
 }
 
-export function GlucoseChart({ patientId, entries = [], loading = false, error = null }: GlucoseChartProps) {
+export function GlucoseChart({ entries = [], loading = false, error = null }: GlucoseChartProps) {
   const { settings } = useSettings();
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [glucoseEntries, setGlucoseEntries] = useState<Entry[]>([]);
@@ -78,42 +82,48 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
   }, [entries]);
 
   // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      const originalValue = data.glucose;
-      const displayValue = settings?.glucoseUnits === 'mmol/L' 
-        ? (originalValue / 18).toFixed(1) 
-        : Math.round(originalValue);
-      const d = new Date(data.timestampMs);
-      const dateLabel = `${formatDate(d)} at ${formatTime(d)}`;
-      return (
-        <Box
-          sx={{
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            borderRadius: 1,
-            p: 1,
-            boxShadow: 2,
-          }}
-        >
-          <Typography variant="body2" fontWeight={600}>
-            {dateLabel}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Glucose: {displayValue} {settings?.glucoseUnits || 'mg/dL'}
-          </Typography>
-        </Box>
-      );
+  const CustomTooltip = ({ active, payload }: TooltipProps<ValueType, NameType>) => {
+    if (!active || !payload || payload.length === 0) {
+      return null;
     }
-    return null;
+
+    const data = payload[0]?.payload as ChartDataPoint | undefined;
+    if (!data) {
+      return null;
+    }
+
+    const originalValue = data.glucose;
+    const displayValue = settings?.glucoseUnits === 'mmol/L'
+      ? (originalValue / 18).toFixed(1)
+      : Math.round(originalValue);
+    const d = new Date(data.timestampMs);
+    const dateLabel = `${formatDate(d)} at ${formatTime(d)}`;
+
+    return (
+      <Box
+        sx={{
+          backgroundColor: 'white',
+          border: '1px solid #ccc',
+          borderRadius: 1,
+          p: 1,
+          boxShadow: 2,
+        }}
+      >
+        <Typography variant="body2" fontWeight={600}>
+          {dateLabel}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Glucose: {displayValue} {settings?.glucoseUnits || 'mg/dL'}
+        </Typography>
+      </Box>
+    );
   };
 
   // Determine if readings span multiple days and how many
   const uniqueDates = Array.from(new Set(chartData.map(d => d.date)));
   let xAxisMode: 'time' | 'datetime' | 'date' = 'time';
-  if (uniqueDates.length > 5) xAxisMode = 'date';
-  else if (uniqueDates.length > 1) xAxisMode = 'datetime';
+  if (uniqueDates.length > 5) {xAxisMode = 'date';}
+  else if (uniqueDates.length > 1) {xAxisMode = 'datetime';}
 
   // Helper for formatting
   function formatDate(d: Date) {
@@ -236,8 +246,8 @@ export function GlucoseChart({ patientId, entries = [], loading = false, error =
                 minTickGap={30}
                 tickFormatter={(value: number) => {
                   const d = new Date(value);
-                  if (xAxisMode === 'date') return formatDate(d);
-                  if (xAxisMode === 'datetime') return `${formatDate(d)} ${formatTime(d)}`;
+                  if (xAxisMode === 'date') {return formatDate(d);}
+                  if (xAxisMode === 'datetime') {return `${formatDate(d)} ${formatTime(d)}`;}
                   return formatTime(d);
                 }}
               />

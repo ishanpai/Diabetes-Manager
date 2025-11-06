@@ -41,7 +41,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   };
 
   const getWelcomeMessage = () => {
-    if (!session?.user) return 'Welcome';
+    if (!session?.user) {return 'Welcome';}
     return `Welcome, ${session.user.name || session.user.email}`;
   };
 

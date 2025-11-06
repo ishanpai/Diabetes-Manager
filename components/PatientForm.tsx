@@ -32,9 +32,13 @@ import {
   Typography,
 } from '@mui/material';
 
+export type PatientFormSubmitData = Omit<PatientFormData, 'usualMedications'> & {
+  usualMedications: string;
+};
+
 interface PatientFormProps {
   patient?: PatientWithEntries | null;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: PatientFormSubmitData) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
   error?: string | null;
@@ -122,16 +126,16 @@ export function PatientForm({
     // Convert medications array to JSON string for backend
     const medicationsJson = JSON.stringify(formData.usualMedications);
     
-    const backendData = {
+    const backendData: PatientFormSubmitData = {
       ...formData,
       diabetesType: formData.diabetesType,
-      usualMedications: medicationsJson
+      usualMedications: medicationsJson,
     };
 
     await onSubmit(backendData);
   };
 
-  const handleInputChange = (field: keyof PatientFormData, value: any) => {
+  const handleInputChange = <K extends keyof PatientFormData>(field: K, value: PatientFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
@@ -269,7 +273,9 @@ export function PatientForm({
                   <Select
                     label="Activity Level"
                     value={formData.activityLevel}
-                    onChange={(e) => handleInputChange('activityLevel', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange('activityLevel', e.target.value as PatientFormData['activityLevel'])
+                    }
                   >
                     <MenuItem value="Low">Low</MenuItem>
                     <MenuItem value="Moderate">Moderate</MenuItem>

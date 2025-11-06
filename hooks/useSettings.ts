@@ -3,6 +3,7 @@ import {
   useState,
 } from 'react';
 
+import { logger } from '@/lib/logger';
 import { useAuth } from './useAuth';
 
 export interface UserSettings {
@@ -43,8 +44,9 @@ export function useSettings() {
         setSettings(defaultSettings);
       }
     } catch (err) {
-      console.error('Error loading settings:', err);
+      logger.error('Error loading settings:', err);
       setSettings(defaultSettings);
+      setError('Error loading settings')
     } finally {
       setLoading(false);
     }
@@ -78,7 +80,8 @@ export function useSettings() {
         throw new Error('Failed to save settings');
       }
     } catch (err) {
-      console.error('Error saving settings:', err);
+      logger.error('Error saving settings:', err);
+      setError("Failed to save settings")
       throw new Error(err instanceof Error ? err.message : 'Failed to save settings');
     }
   };

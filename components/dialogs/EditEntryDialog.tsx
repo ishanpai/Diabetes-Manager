@@ -8,6 +8,7 @@ import {
   EntryFormValues,
 } from '@/components/EntryForm';
 import { useSettings } from '@/hooks/useSettings';
+import { logger } from '@/lib/logger';
 import {
   Entry,
   Medication,
@@ -54,7 +55,7 @@ export function EditEntryDialog({
   }, [entry]);
 
   const handleSubmit = async (data: EntryFormValues) => {
-    if (!entry) return;
+    if (!entry) {return;}
 
     setLoading(true);
     setError(null);
@@ -91,7 +92,7 @@ export function EditEntryDialog({
         throw new Error(result.error || 'Failed to update entry');
       }
     } catch (err) {
-      console.error('Error updating entry:', err);
+      logger.error('Error updating entry:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -119,7 +120,7 @@ export function EditEntryDialog({
       onSuccess({ ...entry, value: 'DELETED' } as Entry);
       onClose();
     } catch (err) {
-      console.error('Error deleting entry:', err);
+      logger.error('Error deleting entry:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -131,12 +132,12 @@ export function EditEntryDialog({
     onClose();
   };
 
-  if (!entry) return null;
+  if (!entry) {return null;}
 
   return (
     <Dialog 
       open={open} 
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="sm"
       fullWidth
     >

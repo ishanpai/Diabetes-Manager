@@ -16,7 +16,7 @@ export default function Home() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    if (status === 'loading') return; // Still loading
+    if (status === 'loading') {return;} // Still loading
     
     if (session) {
       router.push('/dashboard');

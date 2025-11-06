@@ -22,12 +22,13 @@ import {
   users,
   userSettings,
 } from './schema';
+import { logger } from './logger';
 
 // User functions
 export async function findUserByEmail(email: string): Promise<User | null> {
   try {
     const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const user = result[0];
     return {
@@ -38,7 +39,7 @@ export async function findUserByEmail(email: string): Promise<User | null> {
       password: user.password,
     };
   } catch (error) {
-    console.error('Error finding user by email:', error);
+    logger.error('Error finding user by email:', error);
     return null;
   }
 }
@@ -54,7 +55,7 @@ export async function findUsers(): Promise<User[]> {
       password: user.password,
     }));
   } catch (error) {
-    console.error('Error finding users:', error);
+    logger.error('Error finding users:', error);
     return [];
   }
 }
@@ -62,7 +63,7 @@ export async function findUsers(): Promise<User[]> {
 export async function createUser(userData: { email: string; name?: string; image?: string; password?: string }): Promise<User | null> {
   try {
     const result = await db.insert(users).values(userData).returning();
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const user = result[0];
     return {
@@ -73,7 +74,7 @@ export async function createUser(userData: { email: string; name?: string; image
       password: user.password,
     };
   } catch (error) {
-    console.error('Error creating user:', error);
+    logger.error('Error creating user:', error);
     return null;
   }
 }
@@ -102,7 +103,7 @@ export async function findPatientsByUserId(userId: string, limit?: number, offse
       age: calculateAge(patient.dob),
     }));
   } catch (error) {
-    console.error('Error finding patients by user ID:', error);
+    logger.error('Error finding patients by user ID:', error);
     return [];
   }
 }
@@ -110,7 +111,7 @@ export async function findPatientsByUserId(userId: string, limit?: number, offse
 export async function findPatientById(patientId: string): Promise<Patient | null> {
   try {
     const result = await db.select().from(patients).where(eq(patients.id, patientId)).limit(1);
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const patient = result[0];
     return {
@@ -127,7 +128,7 @@ export async function findPatientById(patientId: string): Promise<Patient | null
       age: calculateAge(patient.dob),
     };
   } catch (error) {
-    console.error('Error finding patient by ID:', error);
+    logger.error('Error finding patient by ID:', error);
     return null;
   }
 }
@@ -143,7 +144,7 @@ export async function createPatient(patientData: {
 }): Promise<Patient | null> {
   try {
     const result = await db.insert(patients).values(patientData).returning();
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const patient = result[0];
     return {
@@ -160,7 +161,7 @@ export async function createPatient(patientData: {
       age: calculateAge(patient.dob),
     };
   } catch (error) {
-    console.error('Error creating patient:', error);
+    logger.error('Error creating patient:', error);
     return null;
   }
 }
@@ -179,7 +180,7 @@ export async function updatePatient(patientId: string, updates: Partial<{
       .where(eq(patients.id, patientId))
       .returning();
     
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const patient = result[0];
     return {
@@ -196,7 +197,7 @@ export async function updatePatient(patientId: string, updates: Partial<{
       age: calculateAge(patient.dob),
     };
   } catch (error) {
-    console.error('Error updating patient:', error);
+    logger.error('Error updating patient:', error);
     return null;
   }
 }
@@ -206,7 +207,7 @@ export async function deletePatient(patientId: string): Promise<boolean> {
     const result = await db.delete(patients).where(eq(patients.id, patientId)).returning();
     return result.length > 0;
   } catch (error) {
-    console.error('Error deleting patient:', error);
+    logger.error('Error deleting patient:', error);
     return false;
   }
 }
@@ -232,7 +233,7 @@ export async function findEntriesByPatientId(patientId: string, limit?: number, 
       createdAt: entry.createdAt || new Date(),
     }));
   } catch (error) {
-    console.error('Error finding entries by patient ID:', error);
+    logger.error('Error finding entries by patient ID:', error);
     return [];
   }
 }
@@ -262,7 +263,7 @@ export async function findEntriesByPatientIdAndType(patientId: string, entryType
       createdAt: entry.createdAt || new Date(),
     }));
   } catch (error) {
-    console.error('Error finding entries by patient ID and type:', error);
+    logger.error('Error finding entries by patient ID and type:', error);
     return [];
   }
 }
@@ -275,7 +276,7 @@ export async function countEntriesByPatientId(patientId: string): Promise<number
     
     return Number(result[0]?.count || 0);
   } catch (error) {
-    console.error('Error counting entries by patient ID:', error);
+    logger.error('Error counting entries by patient ID:', error);
     return 0;
   }
 }
@@ -304,7 +305,7 @@ export async function findEntriesByDateRange(patientId: string, startDate: Date,
       createdAt: entry.createdAt || new Date(),
     }));
   } catch (error) {
-    console.error('Error finding entries by date range:', error);
+    logger.error('Error finding entries by date range:', error);
     return [];
   }
 }
@@ -319,7 +320,7 @@ export async function createEntry(entryData: {
 }): Promise<Entry | null> {
   try {
     const result = await db.insert(entries).values(entryData).returning();
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const entry = result[0];
     return {
@@ -333,7 +334,7 @@ export async function createEntry(entryData: {
       createdAt: entry.createdAt || new Date(),
     };
   } catch (error) {
-    console.error('Error creating entry:', error);
+    logger.error('Error creating entry:', error);
     return null;
   }
 }
@@ -350,7 +351,7 @@ export async function updateEntry(entryId: string, updates: Partial<{
       .where(eq(entries.id, entryId))
       .returning();
     
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const entry = result[0];
     return {
@@ -364,7 +365,7 @@ export async function updateEntry(entryId: string, updates: Partial<{
       createdAt: entry.createdAt || new Date(),
     };
   } catch (error) {
-    console.error('Error updating entry:', error);
+    logger.error('Error updating entry:', error);
     return null;
   }
 }
@@ -374,7 +375,7 @@ export async function deleteEntry(entryId: string): Promise<boolean> {
     const result = await db.delete(entries).where(eq(entries.id, entryId)).returning();
     return result.length > 0;
   } catch (error) {
-    console.error('Error deleting entry:', error);
+    logger.error('Error deleting entry:', error);
     return false;
   }
 }
@@ -382,7 +383,7 @@ export async function deleteEntry(entryId: string): Promise<boolean> {
 export async function findEntryById(entryId: string): Promise<Entry | null> {
   try {
     const result = await db.select().from(entries).where(eq(entries.id, entryId)).limit(1);
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const entry = result[0];
     return {
@@ -396,7 +397,7 @@ export async function findEntryById(entryId: string): Promise<Entry | null> {
       createdAt: entry.createdAt || new Date(),
     };
   } catch (error) {
-    console.error('Error finding entry by ID:', error);
+    logger.error('Error finding entry by ID:', error);
     return null;
   }
 }
@@ -423,7 +424,7 @@ export async function findRecommendationsByPatientId(patientId: string): Promise
       createdAt: rec.createdAt || new Date(),
     }));
   } catch (error) {
-    console.error('Error finding recommendations by patient ID:', error);
+    logger.error('Error finding recommendations by patient ID:', error);
     return [];
   }
 }
@@ -441,7 +442,7 @@ export async function createRecommendation(recommendationData: {
 }): Promise<Recommendation | null> {
   try {
     const result = await db.insert(recommendations).values(recommendationData).returning();
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const rec = result[0];
     return {
@@ -458,7 +459,7 @@ export async function createRecommendation(recommendationData: {
       createdAt: rec.createdAt || new Date(),
     };
   } catch (error) {
-    console.error('Error creating recommendation:', error);
+    logger.error('Error creating recommendation:', error);
     return null;
   }
 }
@@ -479,7 +480,7 @@ export async function updateRecommendation(recommendationId: string, updates: Pa
       .where(eq(recommendations.id, recommendationId))
       .returning();
     
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     const rec = result[0];
     return {
@@ -496,7 +497,7 @@ export async function updateRecommendation(recommendationId: string, updates: Pa
       createdAt: rec.createdAt || new Date(),
     };
   } catch (error) {
-    console.error('Error updating recommendation:', error);
+    logger.error('Error updating recommendation:', error);
     return null;
   }
 }
@@ -506,7 +507,7 @@ export async function deleteRecommendation(recommendationId: string): Promise<bo
     const result = await db.delete(recommendations).where(eq(recommendations.id, recommendationId)).returning();
     return result.length > 0;
   } catch (error) {
-    console.error('Error deleting recommendation:', error);
+    logger.error('Error deleting recommendation:', error);
     return false;
   }
 }
@@ -515,13 +516,13 @@ export async function deleteRecommendation(recommendationId: string): Promise<bo
 export async function findUserSettings(userId: string): Promise<{ glucoseUnits: string } | null> {
   try {
     const result = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     return {
       glucoseUnits: result[0].glucoseUnits,
     };
   } catch (error) {
-    console.error('Error finding user settings:', error);
+    logger.error('Error finding user settings:', error);
     return null;
   }
 }
@@ -529,13 +530,13 @@ export async function findUserSettings(userId: string): Promise<{ glucoseUnits: 
 export async function createUserSettings(userId: string, glucoseUnits: string = 'mg/dL'): Promise<{ glucoseUnits: string } | null> {
   try {
     const result = await db.insert(userSettings).values({ userId, glucoseUnits }).returning();
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     return {
       glucoseUnits: result[0].glucoseUnits,
     };
   } catch (error) {
-    console.error('Error creating user settings:', error);
+    logger.error('Error creating user settings:', error);
     return null;
   }
 }
@@ -547,13 +548,13 @@ export async function updateUserSettings(userId: string, glucoseUnits: string): 
       .where(eq(userSettings.userId, userId))
       .returning();
     
-    if (result.length === 0) return null;
+    if (result.length === 0) {return null;}
     
     return {
       glucoseUnits: result[0].glucoseUnits,
     };
   } catch (error) {
-    console.error('Error updating user settings:', error);
+    logger.error('Error updating user settings:', error);
     return null;
   }
 }
@@ -572,7 +573,7 @@ export async function upsertUserSettings(userId: string, glucoseUnits: string): 
       return createUserSettings(userId, glucoseUnits);
     }
   } catch (error) {
-    console.error('Error upserting user settings:', error);
+    logger.error('Error upserting user settings:', error);
     return null;
   }
 }
