@@ -1,28 +1,15 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
-import { getServerSession } from 'next-auth/next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
-import {
-  deletePatient,
-  findPatientById,
-  findUserByEmail,
-  updatePatient,
-} from '@/lib/database';
+import { deletePatient, findPatientById, findUserByEmail, updatePatient } from '@/lib/database';
+import type { Medication } from '@/types';
+import { logger } from '@/lib/logger';
+import { getSessionUserId } from '@/lib/utils/session';
 
 import NextAuth from '../auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, NextAuth);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Access user ID from session - handle both possible structures
-  const userId = (session as any).user?.id || (session as any).user?.email;
+  const userId = await getSessionUserId(req, res, NextAuth);
 
   if (!userId) {
     return res.status(401).json({ error: 'User ID not found' });
@@ -36,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   switch (req.method) {
     case 'GET':
-      return getPatient(req, res, userId, id);
+      return getPatient(res, userId, id);
     case 'PUT':
       return updatePatientHandler(req, res, userId, id);
     case 'DELETE':
@@ -46,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-async function getPatient(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
+async function getPatient(res: NextApiResponse, userId: string, patientId: string) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
@@ -61,6 +48,9 @@ async function getPatient(req: NextApiRequest, res: NextApiResponse, userId: str
     // Fetch patient and await the result
     const patient = await findPatientById(patientId);
     if (!patient) {
+      return res.status(404).json({ error: 'Patient not found or access denied' });
+    }
+    if (patient.userId !== actualUserId) {
       return res.status(404).json({ error: 'Patient not found or access denied' });
     }
 
@@ -69,12 +59,17 @@ async function getPatient(req: NextApiRequest, res: NextApiResponse, userId: str
       data: patient,
     });
   } catch (error) {
-    console.error('Error fetching patient:', error);
+    logger.error('Error fetching patient:', error);
     res.status(500).json({ error: 'Failed to fetch patient' });
   }
 }
 
-async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
+async function updatePatientHandler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  patientId: string,
+) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
@@ -91,7 +86,7 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found or access denied' });
     }
-    if ((patient as any).userId !== actualUserId) {
+    if (patient.userId !== actualUserId) {
       return res.status(404).json({ error: 'Patient not found or access denied' });
     }
     // Create a validation schema
@@ -107,16 +102,22 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
     const validatedData = updatePatientSchema.parse(req.body);
 
     // Prepare update data
-    const updateData: any = {};
+    const updateData: {
+      name?: string;
+      dob?: Date;
+      diabetesType?: 'type1' | 'type2' | 'gestational' | 'other';
+      lifestyle?: string;
+      activityLevel?: string;
+      usualMedications?: Medication[];
+    } = {};
 
     if (validatedData.name !== undefined) {
       updateData.name = validatedData.name;
     }
 
     if (validatedData.dob !== undefined) {
-      updateData.dob = validatedData.dob instanceof Date 
-        ? validatedData.dob 
-        : new Date(validatedData.dob);
+      updateData.dob =
+        validatedData.dob instanceof Date ? validatedData.dob : new Date(validatedData.dob);
     }
 
     if (validatedData.diabetesType !== undefined) {
@@ -132,7 +133,14 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
     }
 
     if (validatedData.usualMedications !== undefined) {
-      updateData.usualMedications = validatedData.usualMedications;
+      try {
+        updateData.usualMedications = JSON.parse(
+          validatedData.usualMedications || '[]',
+        ) as Medication[];
+      } catch (error) {
+        logger.error('Error parsing medications payload:', error);
+        return res.status(400).json({ error: 'Invalid medications format' });
+      }
     }
 
     const updatedPatient = await updatePatient(patientId, updateData);
@@ -141,14 +149,13 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-
     res.status(200).json({
       success: true,
       data: updatedPatient,
       message: 'Patient updated successfully',
     });
   } catch (error) {
-    console.error('Error updating patient:', error);
+    logger.error('Error updating patient:', error);
 
     if (error instanceof Error) {
       return res.status(400).json({ error: error.message });
@@ -158,7 +165,12 @@ async function updatePatientHandler(req: NextApiRequest, res: NextApiResponse, u
   }
 }
 
-async function deletePatientHandler(req: NextApiRequest, res: NextApiResponse, userId: string, patientId: string) {
+async function deletePatientHandler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  patientId: string,
+) {
   try {
     // If userId is an email, find the user first
     let actualUserId = userId;
@@ -175,11 +187,11 @@ async function deletePatientHandler(req: NextApiRequest, res: NextApiResponse, u
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found or access denied' });
     }
-    if ((patient as any).userId !== actualUserId) {
+    if (patient.userId !== actualUserId) {
       return res.status(404).json({ error: 'Patient not found or access denied' });
     }
 
-    const success = deletePatient(patientId);
+    const success = await deletePatient(patientId);
 
     if (!success) {
       return res.status(404).json({ error: 'Patient not found' });
@@ -190,7 +202,7 @@ async function deletePatientHandler(req: NextApiRequest, res: NextApiResponse, u
       message: 'Patient deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting patient:', error);
+    logger.error('Error deleting patient:', error);
     res.status(500).json({ error: 'Failed to delete patient' });
   }
 }

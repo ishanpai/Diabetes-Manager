@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
 import { useRouter } from 'next/router';
 
@@ -49,7 +46,7 @@ export function SettingsForm() {
     try {
       await updateSettings(formData);
       setSaveSuccess(true);
-      
+
       // Hide success message after 3 seconds
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -59,8 +56,11 @@ export function SettingsForm() {
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = <K extends keyof typeof formData>(
+    field: K,
+    value: (typeof formData)[K],
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   if (loading) {
@@ -103,13 +103,19 @@ export function SettingsForm() {
                 Glucose Measurements
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Choose your preferred units for glucose readings. This will be used as the default when adding new glucose entries.
+                Choose your preferred units for glucose readings. This will be used as the default
+                when adding new glucose entries.
               </Typography>
               <FormControl fullWidth>
                 <InputLabel>Glucose Units</InputLabel>
                 <Select
                   value={formData.glucoseUnits}
-                  onChange={(e) => handleInputChange('glucoseUnits', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange(
+                      'glucoseUnits',
+                      e.target.value as typeof formData.glucoseUnits,
+                    )
+                  }
                   label="Glucose Units"
                 >
                   <MenuItem value="mg/dL">mg/dL (US Standard)</MenuItem>
@@ -122,18 +128,10 @@ export function SettingsForm() {
 
             {/* Action Buttons */}
             <Box display="flex" justifyContent="space-between" alignItems="center">
-              <Button 
-                variant="outlined" 
-                onClick={() => router.back()}
-                disabled={saveLoading}
-              >
+              <Button variant="outlined" onClick={() => router.back()} disabled={saveLoading}>
                 Back
               </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={saveLoading}
-              >
+              <Button type="submit" variant="contained" disabled={saveLoading}>
                 {saveLoading ? 'Saving...' : 'Save Settings'}
               </Button>
             </Box>
@@ -142,4 +140,4 @@ export function SettingsForm() {
       </Container>
     </Box>
   );
-} 
+}

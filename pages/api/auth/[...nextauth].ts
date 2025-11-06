@@ -1,13 +1,19 @@
-import NextAuth, { NextAuthOptions } from 'next-auth';
+import NextAuth, {
+  type Account,
+  type NextAuthOptions,
+  type Profile,
+  type Session,
+  type User,
+} from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 
 import { comparePassword } from '@/lib/auth';
-import {
-  createUser,
-  findUserByEmail,
-} from '@/lib/database';
+import { createUser, findUserByEmail } from '@/lib/database';
 import { CustomAdapter } from '@/lib/nextauth-adapter';
+import { logger } from '@/lib/logger';
+
+import type { JWT } from 'next-auth/jwt';
 
 export const authOptions: NextAuthOptions = {
   adapter: CustomAdapter(),
@@ -20,7 +26,7 @@ export const authOptions: NextAuthOptions = {
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -34,7 +40,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           const isValidPassword = await comparePassword(credentials.password, user.password);
-          
+
           if (!isValidPassword) {
             return null;
           }
@@ -46,35 +52,43 @@ export const authOptions: NextAuthOptions = {
             image: user.image,
           };
         } catch (error) {
-          console.error('Auth error:', error);
+          logger.error('Auth error:', error);
           return null;
         }
-      }
-    })
+      },
+    }),
   ],
   session: {
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user, account }: any) {
+    async jwt({ token, user }: { token: JWT; user?: User | null }) {
       if (user) {
         token.id = user.id;
       }
       return token;
     },
-    async session({ session, token }: any) {
-      if (token) {
+    async session({ session, token }: { session: Session; token: JWT }) {
+      if (token?.id && session.user) {
         session.user.id = token.id as string;
       }
       return session;
     },
-    async signIn({ user, account, profile }: any) {
+    async signIn({
+      user,
+      account,
+      profile: _profile,
+    }: {
+      user: User;
+      account: Account | null;
+      profile?: Profile;
+    }) {
       if (account?.provider === 'google') {
         // Ensure user has required fields
         if (!user.email) {
           return false;
         }
-        
+
         // Check if user exists, if not create them
         const existingUser = await findUserByEmail(user.email);
 
@@ -88,7 +102,7 @@ export const authOptions: NextAuthOptions = {
         }
       }
       return true;
-    }
+    },
   },
   pages: {
     signIn: '/auth/signin',
@@ -97,4 +111,4 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export default NextAuth(authOptions); 
+export default NextAuth(authOptions);

@@ -3,21 +3,17 @@ import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 
-import {
-  Box,
-  Button,
-  Container,
-  Paper,
-  Typography,
-} from '@mui/material';
+import { Box, Button, Container, Paper, Typography } from '@mui/material';
 
 export default function Home() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    if (status === 'loading') return; // Still loading
-    
+    if (status === 'loading') {
+      return;
+    } // Still loading
+
     if (session) {
       router.push('/dashboard');
     }
@@ -56,15 +52,15 @@ export default function Home() {
           <Typography variant="h2" component="h1" gutterBottom color="primary">
             Diabetes Workflow Companion
           </Typography>
-          
+
           <Typography variant="h5" component="h2" gutterBottom color="text.secondary">
             Streamline diabetes management with AI-powered insulin recommendations
           </Typography>
-          
+
           <Typography variant="body1" paragraph sx={{ mt: 3, mb: 4 }}>
-            Track patient data, record meals and blood sugar readings, and get intelligent 
-            insulin dose recommendations with a single tap. Designed for caregivers to 
-            provide better diabetes care efficiently and safely.
+            Track patient data, record meals and blood sugar readings, and get intelligent insulin
+            dose recommendations with a single tap. Designed for caregivers to provide better
+            diabetes care efficiently and safely.
           </Typography>
 
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -76,12 +72,7 @@ export default function Home() {
             >
               Get Started
             </Button>
-            <Button
-              variant="outlined"
-              size="large"
-              onClick={handleLogin}
-              sx={{ minWidth: 150 }}
-            >
+            <Button variant="outlined" size="large" onClick={handleLogin} sx={{ minWidth: 150 }}>
               Sign In
             </Button>
           </Box>
@@ -90,7 +81,14 @@ export default function Home() {
             <Typography variant="h6" gutterBottom>
               Key Features
             </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                gap: 2,
+                mt: 2,
+              }}
+            >
               <Typography variant="body2" color="text.secondary">
                 • Multi-patient management
               </Typography>
@@ -115,4 +113,4 @@ export default function Home() {
       </Box>
     </Container>
   );
-} 
+}

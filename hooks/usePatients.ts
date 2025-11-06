@@ -1,9 +1,7 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
 import { PatientWithStats } from '@/types';
+import { logger } from '@/lib/logger';
 
 interface UsePatientsReturn {
   patients: PatientWithStats[];
@@ -22,15 +20,15 @@ export function usePatients(): UsePatientsReturn {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch('/api/patients');
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch patients');
       }
-      
+
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         // Handle both old and new API response formats
         const patientsData = result.data.patients || result.data;
@@ -39,7 +37,7 @@ export function usePatients(): UsePatientsReturn {
         throw new Error(result.error || 'Failed to fetch patients');
       }
     } catch (err) {
-      console.error('Error fetching patients:', err);
+      logger.error('Error fetching patients:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       setPatients([]); // Set empty array on error
     } finally {
@@ -58,4 +56,4 @@ export function usePatients(): UsePatientsReturn {
     refetch: fetchPatients,
     totalPatients: (patients || []).length,
   };
-} 
+}

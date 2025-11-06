@@ -1,12 +1,5 @@
 import { relations } from 'drizzle-orm';
-import {
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // Users table
 export const users = pgTable('users', {
@@ -22,7 +15,9 @@ export const users = pgTable('users', {
 // User settings table
 export const userSettings = pgTable('user_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
   glucoseUnits: text('glucose_units').default('mg/dL').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -36,8 +31,12 @@ export const patients = pgTable('patients', {
   diabetesType: text('diabetes_type').notNull(),
   lifestyle: text('lifestyle'),
   activityLevel: text('activity_level'),
-  usualMedications: jsonb('usual_medications').$type<Array<{ brand: string; dosage: string; timing?: string }>>().default([]),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  usualMedications: jsonb('usual_medications')
+    .$type<Array<{ brand: string; dosage: string; timing?: string }>>()
+    .default([]),
+  userId: uuid('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -45,7 +44,9 @@ export const patients = pgTable('patients', {
 // Entries table
 export const entries = pgTable('entries', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').references(() => patients.id, { onDelete: 'cascade' }).notNull(),
+  patientId: uuid('patient_id')
+    .references(() => patients.id, { onDelete: 'cascade' })
+    .notNull(),
   entryType: text('entry_type').notNull(), // 'glucose', 'meal', 'insulin'
   value: text('value').notNull(),
   units: text('units'),
@@ -57,7 +58,9 @@ export const entries = pgTable('entries', {
 // Recommendations table
 export const recommendations = pgTable('recommendations', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').references(() => patients.id, { onDelete: 'cascade' }).notNull(),
+  patientId: uuid('patient_id')
+    .references(() => patients.id, { onDelete: 'cascade' })
+    .notNull(),
   prompt: text('prompt').notNull(),
   response: text('response').notNull(),
   doseUnits: integer('dose_units'),
@@ -103,4 +106,4 @@ export const recommendationsRelations = relations(recommendations, ({ one }) => 
     fields: [recommendations.patientId],
     references: [patients.id],
   }),
-})); 
+}));

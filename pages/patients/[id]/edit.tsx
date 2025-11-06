@@ -1,23 +1,18 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
 import { useRouter } from 'next/router';
 
-import { PatientForm } from '@/components/PatientForm';
+import { PatientForm, PatientFormSubmitData } from '@/components/PatientForm';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
-import {
-  PatientFormData,
-  PatientWithEntries,
-} from '@/types';
+import { logger } from '@/lib/logger';
+import { PatientWithEntries } from '@/types';
 
 export default function EditPatient() {
   const { isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { id } = router.query;
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patient, setPatient] = useState<PatientWithEntries | null>(null);
@@ -45,7 +40,7 @@ export default function EditPatient() {
         throw new Error(result.error || 'Failed to fetch patient');
       }
     } catch (err) {
-      console.error('Error fetching patient:', err);
+      logger.error('Error fetching patient:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setInitialLoading(false);
@@ -66,8 +61,10 @@ export default function EditPatient() {
     );
   }
 
-  const handleSubmit = async (formData: PatientFormData) => {
-    if (!id || typeof id !== 'string') return;
+  const handleSubmit = async (formData: PatientFormSubmitData) => {
+    if (!id || typeof id !== 'string') {
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -100,7 +97,7 @@ export default function EditPatient() {
         throw new Error(result.error || 'Failed to update patient');
       }
     } catch (err) {
-      console.error('Error updating patient:', err);
+      logger.error('Error updating patient:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -127,4 +124,4 @@ export default function EditPatient() {
       submitButtonText="Update Patient"
     />
   );
-} 
+}

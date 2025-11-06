@@ -10,6 +10,8 @@
     "railway:start": "npx drizzle-kit migrate && next start",
     "railway:migrate": "npx drizzle-kit migrate",
     "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

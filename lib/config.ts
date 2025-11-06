@@ -18,4 +18,4 @@ export const PROGRESS_STEPS = [
 
 export const DOSE_DIFFERENCE_WARNING_THRESHOLD = 0.2;
 
-// Add other config values here as needed 
+// Add other config values here as needed

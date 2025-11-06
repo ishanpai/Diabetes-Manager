@@ -1,9 +1,4 @@
-import {
-  Head,
-  Html,
-  Main,
-  NextScript,
-} from 'next/document';
+import { Head, Html, Main, NextScript } from 'next/document';
 
 export default function Document() {
   return (
@@ -15,7 +10,10 @@ export default function Document() {
           href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
           rel="stylesheet"
         />
-        <meta name="description" content="Diabetes Workflow Companion - Manage your diabetes patients and their data" />
+        <meta
+          name="description"
+          content="Diabetes Workflow Companion - Manage your diabetes patients and their data"
+        />
       </Head>
       <body>
         <Main />
@@ -23,4 +21,4 @@ export default function Document() {
       </body>
     </Html>
   );
-} 
+}
