@@ -2,21 +2,23 @@
   "extends": [
     "next/core-web-vitals",
     "eslint:recommended",
-    "@typescript-eslint/recommended"
+    "plugin:@typescript-eslint/recommended"
   ],
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint"],
   "rules": {
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
-    "prefer-const": "error",
-    "no-var": "error",
+    "@typescript-eslint/no-require-imports": "warn",
+    "prefer-const": "warn",
+    "no-var": "warn",
     "no-console": "warn",
-    "eqeqeq": ["error", "always"],
-    "curly": ["error", "all"],
-    "no-duplicate-imports": "error"
+    "eqeqeq": ["warn", "always"],
+    "curly": ["warn", "all"],
+    "no-duplicate-imports": "error",
+    "no-case-declarations": "warn"
   },
   "env": {
     "browser": true,

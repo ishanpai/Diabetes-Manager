@@ -75,7 +75,10 @@ export function CustomAdapter(): Adapter {
       return account as unknown as AdapterAccount;
     },
 
-    async unlinkAccount({ provider, providerAccountId }) {
+    async unlinkAccount({
+      provider,
+      providerAccountId,
+    }: Pick<AdapterAccount, 'provider' | 'providerAccountId'>) {
       // Implementation would delete the account
       // For now, we'll just return undefined
       return undefined;
