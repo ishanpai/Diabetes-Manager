@@ -1,8 +1,4 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
-import { getServerSession } from 'next-auth/next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
 import {
@@ -11,18 +7,14 @@ import {
   findPatientsByUserId,
   findUserByEmail,
 } from '@/lib/database';
+import { logger } from '@/lib/logger';
+import type { Medication } from '@/types';
 
 import NextAuth from '../auth/[...nextauth]';
+import { getSessionUserId } from '@/lib/utils/session';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, NextAuth);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Access user ID from session - handle both possible structures
-  const userId = (session as any).user?.id || (session as any).user?.email;
+  const userId = await getSessionUserId(req, res, NextAuth);
 
   if (!userId) {
     return res.status(401).json({ error: 'User ID not found' });
@@ -30,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   switch (req.method) {
     case 'GET':
-      return getPatients(req, res, userId);
+      return getPatients(res, userId);
     case 'POST':
       return createPatientHandler(req, res, userId);
     default:
@@ -38,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: string) {
+async function getPatients(res: NextApiResponse, userId: string) {
   try {
     let actualUserId = userId;
     if (userId.includes('@')) {
@@ -52,47 +44,54 @@ async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: st
     const patients = await findPatientsByUserId(actualUserId);
 
     // Transform for response with additional stats
-    const transformedPatients = await Promise.all(patients.map(async patient => {
-      // Get recent entries for stats
-      const entries = await findEntriesByPatientId(patient.id, 10, 0);
-      const glucoseEntries = entries.filter(entry => entry.entryType === 'glucose');
-      const lastGlucoseEntry = glucoseEntries[0]; // Most recent first
-      
-      // Calculate age
-      const age = Math.floor((new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-      
-      // Parse medications
-      let medications = [];
-      try {
-        if (typeof patient.usualMedications === 'string') {
-          medications = JSON.parse(patient.usualMedications);
-        } else {
-          medications = patient.usualMedications || [];
-        }
-      } catch (error) {
-        medications = [];
-      }
+    const transformedPatients = await Promise.all(
+      patients.map(async (patient) => {
+        // Get recent entries for stats
+        const patientEntries = await findEntriesByPatientId(patient.id, 10, 0);
+        const glucoseEntries = patientEntries.filter((entry) => entry.entryType === 'glucose');
+        const lastGlucoseEntry = glucoseEntries[0]; // Most recent first
 
-      return {
-        id: patient.id,
-        name: patient.name,
-        dob: patient.dob,
-        diabetesType: patient.diabetesType,
-        lifestyle: patient.lifestyle,
-        activityLevel: patient.activityLevel,
-        usualMedications: medications,
-        createdAt: patient.createdAt,
-        updatedAt: patient.updatedAt,
-        age,
-        lastGlucoseReading: lastGlucoseEntry ? {
-          value: parseInt(lastGlucoseEntry.value),
-          occurredAt: lastGlucoseEntry.occurredAt,
-          status: getGlucoseStatus(parseInt(lastGlucoseEntry.value)),
-        } : undefined,
-        recentEntries: entries.length,
-        lastEntryDate: entries[0]?.occurredAt,
-      };
-    }));
+        // Calculate age
+        const age = Math.floor(
+          (new Date().getTime() - new Date(patient.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+        );
+
+        // Parse medications
+        let medications: Medication[] = [];
+        try {
+          if (typeof patient.usualMedications === 'string') {
+            medications = JSON.parse(patient.usualMedications) as Medication[];
+          } else {
+            medications = patient.usualMedications || [];
+          }
+        } catch (error) {
+          logger.error('Error parsing patient medications:', error);
+          medications = [];
+        }
+
+        return {
+          id: patient.id,
+          name: patient.name,
+          dob: patient.dob,
+          diabetesType: patient.diabetesType,
+          lifestyle: patient.lifestyle,
+          activityLevel: patient.activityLevel,
+          usualMedications: medications,
+          createdAt: patient.createdAt,
+          updatedAt: patient.updatedAt,
+          age,
+          lastGlucoseReading: lastGlucoseEntry
+            ? {
+                value: parseInt(lastGlucoseEntry.value),
+                occurredAt: lastGlucoseEntry.occurredAt,
+                status: getGlucoseStatus(parseInt(lastGlucoseEntry.value)),
+              }
+            : undefined,
+          recentEntries: patientEntries.length,
+          lastEntryDate: patientEntries[0]?.occurredAt,
+        };
+      }),
+    );
 
     res.status(200).json({
       success: true,
@@ -102,7 +101,7 @@ async function getPatients(req: NextApiRequest, res: NextApiResponse, userId: st
       },
     });
   } catch (error) {
-    console.error('Error fetching patients:', error);
+    logger.error('Error fetching patients:', error);
     res.status(500).json({ error: 'Failed to fetch patients' });
   }
 }
@@ -132,9 +131,15 @@ async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, u
     const validatedData = createPatientSchema.parse(req.body);
 
     // Convert dates if they're strings
-    const dob = validatedData.dob instanceof Date 
-      ? validatedData.dob 
-      : new Date(validatedData.dob);
+    const dob = validatedData.dob instanceof Date ? validatedData.dob : new Date(validatedData.dob);
+
+    let parsedMedications: Medication[] = [];
+    try {
+      parsedMedications = JSON.parse(validatedData.usualMedications || '[]') as Medication[];
+    } catch (error) {
+      logger.error('Error parsing medications payload:', error);
+      return res.status(400).json({ error: 'Invalid medications format' });
+    }
 
     const patientData = {
       userId: actualUserId,
@@ -143,7 +148,7 @@ async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, u
       diabetesType: validatedData.diabetesType,
       lifestyle: validatedData.lifestyle || '',
       activityLevel: validatedData.activityLevel || '',
-      usualMedications: JSON.parse(validatedData.usualMedications || '[]'),
+      usualMedications: parsedMedications,
     };
 
     const newPatient = await createPatient(patientData);
@@ -171,7 +176,7 @@ async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, u
       message: 'Patient created successfully',
     });
   } catch (error) {
-    console.error('Error creating patient:', error);
+    logger.error('Error creating patient:', error);
 
     if (error instanceof Error) {
       return res.status(400).json({ error: error.message });
@@ -182,7 +187,11 @@ async function createPatientHandler(req: NextApiRequest, res: NextApiResponse, u
 }
 
 function getGlucoseStatus(value: number): 'low' | 'normal' | 'high' {
-  if (value < 70) return 'low';
-  if (value > 180) return 'high';
+  if (value < 70) {
+    return 'low';
+  }
+  if (value > 180) {
+    return 'high';
+  }
   return 'normal';
-} 
+}

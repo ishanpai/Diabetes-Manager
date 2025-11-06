@@ -1,16 +1,9 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
-import {
-  DOSE_DIFFERENCE_WARNING_THRESHOLD,
-  PROGRESS_STEPS,
-} from '@/lib/config';
-import {
-  Recommendation,
-  RecommendationProgress,
-} from '@/types';
+import { DOSE_DIFFERENCE_WARNING_THRESHOLD, PROGRESS_STEPS } from '@/lib/config';
+import { Recommendation, RecommendationProgress } from '@/types';
+import type { EntryFormValues } from '@/components/EntryForm';
+import { logger } from '@/lib/logger';
 import { formatDateTimeForInput } from '@/utils/uiUtils';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -39,7 +32,7 @@ interface InsulinRecommendationDialogProps {
   patientId: string;
   patientName: string;
   onSuccess?: (recommendation: Recommendation) => void;
-  onAddEntry?: (entryType: 'insulin', defaultValues: any) => void;
+  onAddEntry?: (entryType: 'insulin', defaultValues: Partial<EntryFormValues>) => void;
 }
 
 export function InsulinRecommendationDialog({
@@ -54,7 +47,7 @@ export function InsulinRecommendationDialog({
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showWarning, setShowWarning] = useState(false);
-  const [lastDose, setLastDose] = useState<number | null>(null);
+  const [lastDose] = useState<number | null>(null);
   const [targetTime, setTargetTime] = useState<Date>(() => {
     // Default to current time + 5 minutes
     const now = new Date();
@@ -77,7 +70,7 @@ export function InsulinRecommendationDialog({
 
   // Debug progress changes
   useEffect(() => {
-    console.log('Progress state changed to:', progress);
+    logger.debug('Progress state changed to:', progress);
   }, [progress]);
 
   const startRecommendation = async () => {
@@ -113,15 +106,19 @@ export function InsulinRecommendationDialog({
       }
 
       let buffer = '';
+      let doneReading = false;
 
-      while (true) {
+      while (!doneReading) {
         const { done, value } = await reader.read();
-        
-        if (done) break;
+
+        if (done) {
+          doneReading = true;
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        
+
         // Keep the last line in buffer if it's incomplete
         buffer = lines.pop() || '';
 
@@ -129,24 +126,24 @@ export function InsulinRecommendationDialog({
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              console.log('Received SSE data:', data);
-              
+              logger.debug('Received SSE data:', data);
+
               switch (data.type) {
                 case 'progress':
-                  console.log('Progress update:', data.step, data.message);
+                  logger.debug('Progress update:', data.step, data.message);
                   setProgress(data.step as RecommendationProgress);
                   // Force a small delay to make progress visible
-                  await new Promise(resolve => setTimeout(resolve, 100));
+                  await new Promise((resolve) => setTimeout(resolve, 100));
                   break;
                 case 'error':
-                  console.log('Error received:', data.error);
+                  logger.debug('Error received:', data.error);
                   setError(data.error);
                   setProgress('error');
                   return;
-                case 'result':
-                  console.log('Result received:', data.data);
-                  const newRecommendation = data.data;
-                  
+                case 'result': {
+                  logger.debug('Result received:', data.data);
+                  const newRecommendation = data.data as Recommendation;
+
                   // Check for dose difference warning (20% threshold)
                   if (newRecommendation.doseUnits && lastDose) {
                     const difference = Math.abs(newRecommendation.doseUnits - lastDose) / lastDose;
@@ -159,15 +156,16 @@ export function InsulinRecommendationDialog({
                   setProgress('complete');
                   onSuccess?.(newRecommendation);
                   return;
+                }
               }
             } catch (parseError) {
-              console.error('Error parsing SSE data:', parseError, 'Line:', line);
+              logger.error('Error parsing SSE data:', parseError, 'Line:', line);
             }
           }
         }
       }
     } catch (err) {
-      console.error('Recommendation error:', err);
+      logger.error('Recommendation error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
       setProgress('error');
     }
@@ -182,19 +180,25 @@ export function InsulinRecommendationDialog({
   };
 
   const getProgressLabel = () => {
-    const currentStep = PROGRESS_STEPS.find(step => step.key === progress);
-    console.log('Current progress:', progress, 'Label:', currentStep?.label);
+    const currentStep = PROGRESS_STEPS.find((step) => step.key === progress);
+    logger.debug('Current progress:', progress, 'Label:', currentStep?.label);
     return currentStep?.label || 'Processing...';
   };
 
   const getProgressValue = () => {
-    if (progress === 'idle') return 0;
-    if (progress === 'error') return 0;
-    if (progress === 'complete') return 100;
-    
-    const currentIndex = PROGRESS_STEPS.findIndex(step => step.key === progress);
+    if (progress === 'idle') {
+      return 0;
+    }
+    if (progress === 'error') {
+      return 0;
+    }
+    if (progress === 'complete') {
+      return 100;
+    }
+
+    const currentIndex = PROGRESS_STEPS.findIndex((step) => step.key === progress);
     const value = ((currentIndex + 1) / PROGRESS_STEPS.length) * 100;
-    console.log('Progress value:', progress, 'Index:', currentIndex, 'Value:', value);
+    logger.debug('Progress value:', progress, 'Index:', currentIndex, 'Value:', value);
     return value;
   };
 
@@ -218,7 +222,8 @@ export function InsulinRecommendationDialog({
                   Target Time for Insulin
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  When do you plan to administer the insulin? This helps provide more accurate recommendations.
+                  When do you plan to administer the insulin? This helps provide more accurate
+                  recommendations.
                 </Typography>
                 <TextField
                   label="Target Time (Local Timezone)"
@@ -250,9 +255,9 @@ export function InsulinRecommendationDialog({
                   <CircularProgress size={20} />
                   <Typography variant="body2">{getProgressLabel()}</Typography>
                 </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={getProgressValue()} 
+                <LinearProgress
+                  variant="determinate"
+                  value={getProgressValue()}
                   sx={{ height: 8, borderRadius: 4 }}
                 />
               </CardContent>
@@ -268,18 +273,14 @@ export function InsulinRecommendationDialog({
 
           {/* Warning Section */}
           {showWarning && recommendation && (
-            <Alert 
-              severity="warning" 
-              icon={<WarningIcon />}
-              sx={{ alignItems: 'flex-start' }}
-            >
+            <Alert severity="warning" icon={<WarningIcon />} sx={{ alignItems: 'flex-start' }}>
               <Box>
                 <Typography variant="body2" fontWeight={600} gutterBottom>
                   Dose Difference Warning
                 </Typography>
                 <Typography variant="body2">
-                  This recommended dose differs by more than 20% from your most recent comparable dose. 
-                  Please review carefully before administering.
+                  This recommended dose differs by more than 20% from your most recent comparable
+                  dose. Please review carefully before administering.
                 </Typography>
               </Box>
             </Alert>
@@ -292,7 +293,7 @@ export function InsulinRecommendationDialog({
                 <Typography variant="h6" gutterBottom>
                   Recommended Dose
                 </Typography>
-                
+
                 <Box display="flex" alignItems="center" gap={2} mb={3}>
                   <Typography variant="h4" color="primary" fontWeight={600}>
                     {recommendation.doseUnits} IU
@@ -304,10 +305,16 @@ export function InsulinRecommendationDialog({
                   )}
                   <Chip label="Recommended" color="primary" variant="outlined" />
                   {recommendation.confidence && (
-                    <Chip 
-                      label={`Confidence: ${recommendation.confidence}`} 
-                      color={recommendation.confidence === 'high' ? 'success' : recommendation.confidence === 'medium' ? 'warning' : 'error'}
-                      variant="outlined" 
+                    <Chip
+                      label={`Confidence: ${recommendation.confidence}`}
+                      color={
+                        recommendation.confidence === 'high'
+                          ? 'success'
+                          : recommendation.confidence === 'medium'
+                            ? 'warning'
+                            : 'error'
+                      }
+                      variant="outlined"
                       size="small"
                     />
                   )}
@@ -351,10 +358,13 @@ export function InsulinRecommendationDialog({
                 {/* Legal Disclaimer */}
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                    <strong>Legal Disclaimer:</strong> This recommendation is for informational purposes only and should not replace professional medical advice. Always consult with a healthcare provider before making changes to insulin dosing.
+                    <strong>Legal Disclaimer:</strong> This recommendation is for informational
+                    purposes only and should not replace professional medical advice. Always consult
+                    with a healthcare provider before making changes to insulin dosing.
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    <strong>Safety Notice:</strong> This tool is designed to assist caregivers but does not guarantee accuracy. Verify all doses with a healthcare professional.
+                    <strong>Safety Notice:</strong> This tool is designed to assist caregivers but
+                    does not guarantee accuracy. Verify all doses with a healthcare professional.
                   </Typography>
                 </Box>
 
@@ -376,9 +386,16 @@ export function InsulinRecommendationDialog({
                       }}
                       sx={{ mb: 1 }}
                     >
-                      Add {recommendation.doseUnits} IU {recommendation.medicationName ? `of ${recommendation.medicationName}` : ''} as Entry
+                      Add {recommendation.doseUnits} IU{' '}
+                      {recommendation.medicationName ? `of ${recommendation.medicationName}` : ''}{' '}
+                      as Entry
                     </Button>
-                    <Typography variant="caption" color="text.secondary" display="block" textAlign="center">
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      textAlign="center"
+                    >
                       You can modify the dose and medication in the entry form if needed
                     </Typography>
                   </Box>
@@ -406,4 +423,4 @@ export function InsulinRecommendationDialog({
       </DialogActions>
     </Dialog>
   );
-} 
+}

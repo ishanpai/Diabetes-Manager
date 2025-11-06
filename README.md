@@ -5,6 +5,7 @@ A web application that helps caregivers track patient data (meals, blood sugar r
 ## 🎯 Purpose
 
 This application streamlines diabetes management by:
+
 - Enabling quick data entry for multiple patients
 - Providing AI-generated insulin recommendations
 - Presenting clean visual data formats
@@ -31,7 +32,7 @@ This application streamlines diabetes management by:
 
 ## 📋 Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - Docker (for deployment)
 - API key for OpenAI or Anthropic
 
@@ -40,22 +41,26 @@ This application streamlines diabetes management by:
 ### Development Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd diabetes-manager
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp .env.example .env.local
    ```
-   
+
    Edit `.env.local` with your configuration:
+
    ```env
    DATABASE_URL="file:./dev.db"
    JWT_SECRET="your-super-secret-jwt-key"
@@ -64,6 +69,7 @@ This application streamlines diabetes management by:
    ```
 
 4. **Run the development server**
+
    ```bash
    npm run dev
    ```
@@ -76,11 +82,13 @@ This application streamlines diabetes management by:
 #### Option 1: Docker Deployment (Recommended)
 
 1. **Build the Docker image**
+
    ```bash
    docker build -t diabetes-companion .
    ```
 
 2. **Run the container**
+
    ```bash
    docker run -d \
        -p 80:3000 \
@@ -97,6 +105,7 @@ This application streamlines diabetes management by:
 #### Option 2: Direct Deployment
 
 1. **Build the application**
+
    ```bash
    npm run build
    ```
@@ -140,17 +149,18 @@ diabetes-manager/
 
 ### Environment Variables
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `DATABASE_URL` | SQLite database connection string | Yes | `file:./data/diabetes.db` |
-| `JWT_SECRET` | Secret key for JWT tokens | Yes | - |
-| `MODEL_API_KEY` | OpenAI or Anthropic API key | Yes | - |
-| `MODEL_NAME` | AI model to use | Yes | `openai-4o-mini` |
-| `NODE_ENV` | Environment mode | No | `development` |
+| Variable        | Description                       | Required | Default                   |
+| --------------- | --------------------------------- | -------- | ------------------------- |
+| `DATABASE_URL`  | SQLite database connection string | Yes      | `file:./data/diabetes.db` |
+| `JWT_SECRET`    | Secret key for JWT tokens         | Yes      | -                         |
+| `MODEL_API_KEY` | OpenAI or Anthropic API key       | Yes      | -                         |
+| `MODEL_NAME`    | AI model to use                   | Yes      | `openai-4o-mini`          |
+| `NODE_ENV`      | Environment mode                  | No       | `development`             |
 
 ### Database Schema
 
 The application uses SQLite with the following main tables:
+
 - `patients`: Patient profiles and medication preferences
 - `entries`: Blood sugar readings, meals, and insulin doses
 - `recommendations`: AI-generated recommendations and reasoning
@@ -170,16 +180,16 @@ npm run test:coverage
 
 ## 📊 API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/signup` | Create new user account |
-| POST | `/api/auth/login` | Authenticate user |
-| GET | `/api/patients` | List all patients |
-| POST | `/api/patients` | Create new patient |
-| POST | `/api/entries` | Add new entry (glucose/meal/insulin) |
-| PUT | `/api/entries/:id` | Update existing entry |
-| DELETE | `/api/entries/:id` | Delete entry |
-| POST | `/api/recommend` | Generate insulin recommendation |
+| Method | Endpoint           | Description                          |
+| ------ | ------------------ | ------------------------------------ |
+| POST   | `/api/auth/signup` | Create new user account              |
+| POST   | `/api/auth/login`  | Authenticate user                    |
+| GET    | `/api/patients`    | List all patients                    |
+| POST   | `/api/patients`    | Create new patient                   |
+| POST   | `/api/entries`     | Add new entry (glucose/meal/insulin) |
+| PUT    | `/api/entries/:id` | Update existing entry                |
+| DELETE | `/api/entries/:id` | Delete entry                         |
+| POST   | `/api/recommend`   | Generate insulin recommendation      |
 
 ## 🔒 Security Features
 
@@ -231,6 +241,7 @@ This application provides AI-generated recommendations for insulin dosing. These
 ## 🆘 Support
 
 For support and questions:
+
 - Create an issue in the repository
 - Check the documentation in the `/docs` folder
 - Review the troubleshooting guide
@@ -238,4 +249,4 @@ For support and questions:
 ## 🔄 Updates
 
 - **v1.0.0**: Initial release with core functionality
-- Future updates will include enhanced AI models, additional medication support, and improved analytics 
+- Future updates will include enhanced AI models, additional medication support, and improved analytics

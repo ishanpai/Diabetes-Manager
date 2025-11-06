@@ -1,8 +1,4 @@
-import {
-  NextApiRequest,
-  NextApiResponse,
-} from 'next';
-import { getServerSession } from 'next-auth/next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 
 import {
@@ -12,18 +8,14 @@ import {
   findEntriesByPatientIdAndType,
   findUserByEmail,
 } from '@/lib/database';
+import { logger } from '@/lib/logger';
+import { getSessionUserId } from '@/lib/utils/session';
+import type { Entry } from '@/types';
 
 import NextAuth from '../auth/[...nextauth]';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, NextAuth);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Access user ID from session - handle both possible structures
-  const userId = (session as any).user?.id || (session as any).user?.email;
+  const userId = await getSessionUserId(req, res, NextAuth);
 
   if (!userId) {
     return res.status(401).json({ error: 'User ID not found' });
@@ -31,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   switch (req.method) {
     case 'GET':
-      return getEntries(req, res, userId);
+      return getEntries(req, res);
     case 'POST':
       return createEntryHandler(req, res, userId);
     default:
@@ -39,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: string) {
+async function getEntries(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { patientId, limit, offset, entryType, startDate, endDate } = req.query;
 
@@ -50,22 +42,36 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
     const parsedLimit = limit ? parseInt(limit as string, 10) : 25;
     const parsedOffset = offset ? parseInt(offset as string, 10) : 0;
 
-    let entries;
-    let totalCount;
+    let entries: Entry[] = [];
+    let totalCount = 0;
 
     // If filtering by entry type, use the filtered function
-    if (entryType && typeof entryType === 'string' && ['glucose', 'meal', 'insulin'].includes(entryType)) {
-      entries = await findEntriesByPatientIdAndType(patientId, entryType as 'glucose' | 'meal' | 'insulin', parsedLimit, parsedOffset);
-      
+    if (
+      entryType &&
+      typeof entryType === 'string' &&
+      ['glucose', 'meal', 'insulin'].includes(entryType)
+    ) {
+      entries = await findEntriesByPatientIdAndType(
+        patientId,
+        entryType as 'glucose' | 'meal' | 'insulin',
+        parsedLimit,
+        parsedOffset,
+      );
+
       // For now, we'll get all entries of this type and count them
       // In a production app, you'd want a separate count function for filtered results
-      const allEntriesOfType = await findEntriesByPatientIdAndType(patientId, entryType as 'glucose' | 'meal' | 'insulin', 10000, 0);
+      const allEntriesOfType = await findEntriesByPatientIdAndType(
+        patientId,
+        entryType as 'glucose' | 'meal' | 'insulin',
+        10000,
+        0,
+      );
       totalCount = allEntriesOfType.length;
     } else {
       // Get total count and entries in parallel for unfiltered results
       [totalCount, entries] = await Promise.all([
         countEntriesByPatientId(patientId),
-        findEntriesByPatientId(patientId, parsedLimit, parsedOffset)
+        findEntriesByPatientId(patientId, parsedLimit, parsedOffset),
       ]);
     }
 
@@ -73,12 +79,12 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
     if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
       const start = new Date(startDate);
       const end = new Date(endDate);
-      
-      entries = entries.filter(entry => {
+
+      entries = entries.filter((entry) => {
         const entryDate = new Date(entry.occurredAt);
         return entryDate >= start && entryDate <= end;
       });
-      
+
       // Recalculate total count for filtered results
       totalCount = entries.length;
     }
@@ -92,7 +98,7 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
       hasMore,
     });
   } catch (error) {
-    console.error('Error fetching entries:', error);
+    logger.error('Error fetching entries:', error);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }
@@ -100,13 +106,11 @@ async function getEntries(req: NextApiRequest, res: NextApiResponse, userId: str
 async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, userId: string) {
   try {
     // If userId is an email, find the user first
-    let actualUserId = userId;
     if (userId.includes('@')) {
       const user = await findUserByEmail(userId);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      actualUserId = user.id;
     }
 
     // Create a validation schema
@@ -137,12 +141,13 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     const validatedData = createEntrySchema.parse(req.body);
 
     // Convert occurredAt to Date if it's a string
-    const occurredAt = validatedData.occurredAt instanceof Date 
-      ? validatedData.occurredAt 
-      : new Date(validatedData.occurredAt);
+    const occurredAt =
+      validatedData.occurredAt instanceof Date
+        ? validatedData.occurredAt
+        : new Date(validatedData.occurredAt);
 
     // Prepare entry data
-    const entryData: any = {
+    const entryData: Parameters<typeof createEntry>[0] = {
       entryType: validatedData.entryType,
       value: validatedData.value,
       occurredAt,
@@ -158,7 +163,7 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
     }
 
     // Debug: log the entry data before creating
-    console.log('Creating entry with data:', JSON.stringify(entryData, null, 2));
+    logger.info('Creating entry with data:', JSON.stringify(entryData, null, 2));
 
     const newEntry = await createEntry(entryData);
 
@@ -184,7 +189,7 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
       message: 'Entry created successfully',
     });
   } catch (error) {
-    console.error('Error creating entry:', error);
+    logger.error('Error creating entry:', error);
 
     if (error instanceof Error) {
       return res.status(400).json({ error: error.message });
@@ -192,4 +197,4 @@ async function createEntryHandler(req: NextApiRequest, res: NextApiResponse, use
 
     res.status(500).json({ error: 'Failed to create entry' });
   }
-} 
+}

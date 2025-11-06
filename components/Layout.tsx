@@ -1,12 +1,6 @@
-import {
-  ReactNode,
-  useState,
-} from 'react';
+import { ReactNode, useState } from 'react';
 
-import {
-  signOut,
-  useSession,
-} from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -41,7 +35,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   };
 
   const getWelcomeMessage = () => {
-    if (!session?.user) return 'Welcome';
+    if (!session?.user) {
+      return 'Welcome';
+    }
     return `Welcome, ${session.user.name || session.user.email}`;
   };
 
@@ -50,17 +46,17 @@ export default function Layout({ children }: { children: ReactNode }) {
       <AppBar position="static" color="primary" elevation={1}>
         <Toolbar>
           <Link href="/" passHref legacyBehavior>
-            <Typography 
-              variant="h6" 
-              component="a" 
-              sx={{ 
-                flexGrow: 1, 
-                textDecoration: 'none', 
+            <Typography
+              variant="h6"
+              component="a"
+              sx={{
+                flexGrow: 1,
+                textDecoration: 'none',
                 color: 'inherit',
                 cursor: 'pointer',
                 '&:hover': {
                   opacity: 0.8,
-                }
+                },
               }}
             >
               Diabetes Workflow Companion
@@ -74,25 +70,29 @@ export default function Layout({ children }: { children: ReactNode }) {
               <>
                 <IconButton
                   onClick={handleMenuOpen}
-                  sx={{ 
+                  sx={{
                     color: 'inherit',
                     '&:hover': {
                       backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    }
+                    },
                   }}
                 >
-                  <Avatar 
-                    sx={{ 
-                      width: 32, 
+                  <Avatar
+                    sx={{
+                      width: 32,
                       height: 32,
                       bgcolor: 'rgba(255, 255, 255, 0.2)',
                       color: 'inherit',
-                      fontSize: '1rem'
+                      fontSize: '1rem',
                     }}
                   >
-                    {session.user.name ? session.user.name.charAt(0).toUpperCase() : 
-                     session.user.email ? session.user.email.charAt(0).toUpperCase() : 
-                     <AccountCircleIcon />}
+                    {session.user.name ? (
+                      session.user.name.charAt(0).toUpperCase()
+                    ) : session.user.email ? (
+                      session.user.email.charAt(0).toUpperCase()
+                    ) : (
+                      <AccountCircleIcon />
+                    )}
                   </Avatar>
                 </IconButton>
                 <Menu
@@ -111,36 +111,36 @@ export default function Layout({ children }: { children: ReactNode }) {
                     sx: {
                       mt: 1,
                       minWidth: 150,
-                    }
+                    },
                   }}
                 >
                   <Link href="/settings" passHref legacyBehavior>
-                    <MenuItem 
+                    <MenuItem
                       component="a"
                       onClick={handleMenuClose}
-                      sx={{ 
+                      sx={{
                         textDecoration: 'none',
                         color: 'inherit',
                         '&:hover': {
                           backgroundColor: 'primary.light',
                           color: 'primary.contrastText',
-                        }
+                        },
                       }}
                     >
                       <SettingsIcon sx={{ mr: 1, fontSize: 20 }} />
                       Settings
                     </MenuItem>
                   </Link>
-                  <MenuItem 
+                  <MenuItem
                     onClick={() => {
                       handleMenuClose();
                       handleLogout();
                     }}
-                    sx={{ 
+                    sx={{
                       '&:hover': {
                         backgroundColor: 'error.light',
                         color: 'error.contrastText',
-                      }
+                      },
                     }}
                   >
                     <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
@@ -157,4 +157,4 @@ export default function Layout({ children }: { children: ReactNode }) {
       </Container>
     </Box>
   );
-} 
+}

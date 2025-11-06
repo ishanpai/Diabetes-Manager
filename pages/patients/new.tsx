@@ -2,9 +2,9 @@ import { useState } from 'react';
 
 import { useRouter } from 'next/router';
 
-import { PatientForm } from '@/components/PatientForm';
+import { PatientForm, PatientFormSubmitData } from '@/components/PatientForm';
 import { useAuth } from '@/hooks/useAuth';
-import { PatientFormData } from '@/types';
+import { logger } from '@/lib/logger';
 
 export default function NewPatient() {
   const { isLoading: authLoading } = useAuth();
@@ -16,7 +16,7 @@ export default function NewPatient() {
     return null; // Let the layout handle loading
   }
 
-  const handleSubmit = async (formData: PatientFormData) => {
+  const handleSubmit = async (formData: PatientFormSubmitData) => {
     setLoading(true);
     setError(null);
 
@@ -48,7 +48,7 @@ export default function NewPatient() {
         throw new Error(result.error || 'Failed to create patient');
       }
     } catch (err) {
-      console.error('Error creating patient:', err);
+      logger.error('Error creating patient:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -70,4 +70,4 @@ export default function NewPatient() {
       submitButtonText="Save Patient"
     />
   );
-} 
+}

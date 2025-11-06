@@ -10,4 +10,4 @@ export default function SettingsPage() {
   }
 
   return <SettingsForm />;
-} 
+}

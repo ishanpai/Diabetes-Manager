@@ -1,23 +1,16 @@
 import { useState } from 'react';
 
-import {
-  EntryForm,
-  EntryFormValues,
-} from '@/components/EntryForm';
-import { Entry } from '@/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@mui/material';
+import { EntryForm, EntryFormValues } from '@/components/EntryForm';
+import { Entry, Medication } from '@/types';
+import { Dialog, DialogContent, DialogTitle } from '@mui/material';
 
 interface AddEntryDialogProps {
   open: boolean;
   onClose: () => void;
   entryType: 'glucose' | 'meal' | 'insulin';
   patientId: string;
-  patientMedications?: Array<{ brand: string; dosage: string; timing?: string }>;
-  defaultValues?: any;
+  patientMedications?: Medication[];
+  defaultValues?: Partial<EntryFormValues>;
   onSuccess?: (entry: Entry) => void;
 }
 
@@ -32,19 +25,6 @@ export function AddEntryDialog({
 }: AddEntryDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const getDialogTitle = () => {
-    switch (entryType) {
-      case 'glucose':
-        return 'Add Glucose Reading';
-      case 'meal':
-        return 'Add Meal';
-      case 'insulin':
-        return 'Add Insulin Dose';
-      default:
-        return 'Add Entry';
-    }
-  };
 
   const handleSubmit = async (data: EntryFormValues) => {
     setLoading(true);
@@ -85,15 +65,8 @@ export function AddEntryDialog({
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-    >
-      <DialogTitle>
-        Add {entryType.charAt(0).toUpperCase() + entryType.slice(1)} Entry
-      </DialogTitle>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Add {entryType.charAt(0).toUpperCase() + entryType.slice(1)} Entry</DialogTitle>
       <DialogContent>
         <EntryForm
           entryType={entryType}
@@ -109,4 +82,4 @@ export function AddEntryDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}

@@ -1,7 +1,9 @@
-import {
-  Medication,
-  Patient,
-} from '@/types';
+import { Medication, Patient } from '@/types';
+import { logger } from '@/lib/logger';
+
+type RawPatient = Patient & {
+  usualMedications?: string | Medication[];
+};
 
 export interface PatientWithParsedMedications extends Omit<Patient, 'usualMedications'> {
   usualMedications: Medication[];
@@ -12,33 +14,39 @@ export interface PatientWithParsedMedications extends Omit<Patient, 'usualMedica
  * This function handles the conversion from SQLite's string storage to the frontend array format
  * Also trims medication fields to clean up any trailing whitespace
  */
-export function parsePatientMedications(patient: any): PatientWithParsedMedications {
+export function parsePatientMedications(patient: RawPatient): PatientWithParsedMedications {
   let medications: Medication[] = [];
-  
-  if (patient.usualMedications) {
+
+  if (typeof patient.usualMedications === 'string') {
     try {
-      medications = JSON.parse(patient.usualMedications);
+      medications = JSON.parse(patient.usualMedications || '[]');
       // Trim medication fields to clean up any trailing whitespace
-      medications = medications.map(med => ({
+      medications = medications.map((med) => ({
         brand: med.brand?.trim() || '',
         dosage: med.dosage?.trim() || '',
         timing: med.timing?.trim() || '',
       }));
     } catch (error) {
-      console.error('Error parsing patient medications:', error);
+      logger.error('Error parsing patient medications:', error);
       medications = [];
     }
+  } else if (Array.isArray(patient.usualMedications)) {
+    medications = patient.usualMedications.map((med) => ({
+      brand: med.brand?.trim() || '',
+      dosage: med.dosage?.trim() || '',
+      timing: med.timing?.trim() || '',
+    }));
   }
-  
+
   return {
     ...patient,
-    usualMedications: medications
+    usualMedications: medications,
   };
 }
 
 /**
  * Parses medications for multiple patients
  */
-export function parsePatientsMedications(patients: any[]): PatientWithParsedMedications[] {
+export function parsePatientsMedications(patients: RawPatient[]): PatientWithParsedMedications[] {
   return patients.map(parsePatientMedications);
 }

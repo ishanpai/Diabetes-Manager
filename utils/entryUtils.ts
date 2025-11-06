@@ -83,19 +83,23 @@ export function getEntryDescription(entry: Entry): string {
 }
 
 export function sortEntriesByDate(entries: Entry[]): Entry[] {
-  return [...entries].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+  return [...entries].sort(
+    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+  );
 }
 
 export function filterEntriesByType(entries: Entry[], type: Entry['entryType']): Entry[] {
-  return entries.filter(entry => entry.entryType === type);
+  return entries.filter((entry) => entry.entryType === type);
 }
 
 export function getLatestEntry(entries: Entry[]): Entry | null {
-  if (entries.length === 0) return null;
+  if (entries.length === 0) {
+    return null;
+  }
   return sortEntriesByDate(entries)[0];
 }
 
 export function getLatestGlucoseEntry(entries: Entry[]): Entry | null {
   const glucoseEntries = filterEntriesByType(entries, 'glucose');
   return getLatestEntry(glucoseEntries);
-} 
+}

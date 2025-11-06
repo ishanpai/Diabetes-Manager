@@ -1,14 +1,7 @@
-import {
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import {
-  Medication,
-  PatientFormData,
-  PatientWithEntries,
-} from '@/types';
+import { Medication, PatientFormData, PatientWithEntries } from '@/types';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -32,9 +25,13 @@ import {
   Typography,
 } from '@mui/material';
 
+export type PatientFormSubmitData = Omit<PatientFormData, 'usualMedications'> & {
+  usualMedications: string;
+};
+
 interface PatientFormProps {
   patient?: PatientWithEntries | null;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: PatientFormSubmitData) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
   error?: string | null;
@@ -67,18 +64,19 @@ export function PatientForm({
   // Load patient data when editing
   useEffect(() => {
     if (patient) {
-      
       setFormData({
         name: patient.name,
-        dob: patient.dob instanceof Date 
-          ? patient.dob.toISOString().split('T')[0] 
-          : new Date(patient.dob).toISOString().split('T')[0],
+        dob:
+          patient.dob instanceof Date
+            ? patient.dob.toISOString().split('T')[0]
+            : new Date(patient.dob).toISOString().split('T')[0],
         diabetesType: patient.diabetesType,
         lifestyle: patient.lifestyle || '',
         activityLevel: patient.activityLevel || 'Moderate',
-        usualMedications: patient.usualMedications.length > 0 
-          ? patient.usualMedications 
-          : [{ brand: '', dosage: '', timing: '' }],
+        usualMedications:
+          patient.usualMedications.length > 0
+            ? patient.usualMedications
+            : [{ brand: '', dosage: '', timing: '' }],
       });
     }
   }, [patient]);
@@ -114,45 +112,48 @@ export function PatientForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     // Convert medications array to JSON string for backend
     const medicationsJson = JSON.stringify(formData.usualMedications);
-    
-    const backendData = {
+
+    const backendData: PatientFormSubmitData = {
       ...formData,
       diabetesType: formData.diabetesType,
-      usualMedications: medicationsJson
+      usualMedications: medicationsJson,
     };
 
     await onSubmit(backendData);
   };
 
-  const handleInputChange = (field: keyof PatientFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = <K extends keyof PatientFormData>(
+    field: K,
+    value: PatientFormData[K],
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: '' }));
     }
   };
 
   const handleMedicationChange = (index: number, field: keyof Medication, value: string) => {
     const updatedMedications = [...formData.usualMedications];
     updatedMedications[index] = { ...updatedMedications[index], [field]: value };
-    setFormData(prev => ({ ...prev, usualMedications: updatedMedications }));
+    setFormData((prev) => ({ ...prev, usualMedications: updatedMedications }));
 
     // Clear error when user starts typing
     const errorKey = `medications.${index}.${field}`;
     if (errors[errorKey]) {
-      setErrors(prev => ({ ...prev, [errorKey]: '' }));
+      setErrors((prev) => ({ ...prev, [errorKey]: '' }));
     }
   };
 
   const addMedication = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       usualMedications: [...prev.usualMedications, { brand: '', dosage: '', timing: '' }],
     }));
@@ -160,7 +161,7 @@ export function PatientForm({
 
   const removeMedication = (index: number) => {
     if (formData.usualMedications.length > 1) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         usualMedications: prev.usualMedications.filter((_, i) => i !== index),
       }));
@@ -181,16 +182,18 @@ export function PatientForm({
           <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
             {subtitle}
           </Typography>
-          
+
           <form onSubmit={handleSubmit}>
             {error && (
               <Alert severity="error" icon={<ErrorOutlineIcon />} sx={{ mb: 3 }}>
                 {error}
               </Alert>
             )}
-            
+
             {/* Basic Information */}
-            <Typography variant="h6" gutterBottom>Basic Information</Typography>
+            <Typography variant="h6" gutterBottom>
+              Basic Information
+            </Typography>
             <Grid container spacing={3} mb={2}>
               <Grid item xs={12} md={6}>
                 <TextField
@@ -228,7 +231,10 @@ export function PatientForm({
                     <MenuItem value="type1">
                       <Box display="flex" alignItems="center" gap={1}>
                         Type 1
-                        <Tooltip title="The body doesn't produce insulin. Also known as insulin-dependent diabetes, it usually develops in children/young adults. Requires insulin injections." placement="right">
+                        <Tooltip
+                          title="The body doesn't produce insulin. Also known as insulin-dependent diabetes, it usually develops in children/young adults. Requires insulin injections."
+                          placement="right"
+                        >
                           <HelpOutlineIcon fontSize="small" color="action" />
                         </Tooltip>
                       </Box>
@@ -236,7 +242,10 @@ export function PatientForm({
                     <MenuItem value="type2">
                       <Box display="flex" alignItems="center" gap={1}>
                         Type 2
-                        <Tooltip title="The body doesn't use insulin properly. Usually develops in adults. Can be managed with diet, exercise, and medication." placement="right">
+                        <Tooltip
+                          title="The body doesn't use insulin properly. Usually develops in adults. Can be managed with diet, exercise, and medication."
+                          placement="right"
+                        >
                           <HelpOutlineIcon fontSize="small" color="action" />
                         </Tooltip>
                       </Box>
@@ -244,7 +253,10 @@ export function PatientForm({
                     <MenuItem value="gestational">
                       <Box display="flex" alignItems="center" gap={1}>
                         Gestational
-                        <Tooltip title="Develops during pregnancy. Usually goes away after childbirth but increases risk of Type 2 later." placement="right">
+                        <Tooltip
+                          title="Develops during pregnancy. Usually goes away after childbirth but increases risk of Type 2 later."
+                          placement="right"
+                        >
                           <HelpOutlineIcon fontSize="small" color="action" />
                         </Tooltip>
                       </Box>
@@ -252,14 +264,18 @@ export function PatientForm({
                     <MenuItem value="other">
                       <Box display="flex" alignItems="center" gap={1}>
                         Other
-                        <Tooltip title="Includes rare forms like MODY, LADA, or other specific types." placement="right">
+                        <Tooltip
+                          title="Includes rare forms like MODY, LADA, or other specific types."
+                          placement="right"
+                        >
                           <HelpOutlineIcon fontSize="small" color="action" />
                         </Tooltip>
                       </Box>
                     </MenuItem>
                   </Select>
                   <FormHelperText>
-                    {errors.diabetesType || "Click the help icons (?) for more information about each type"}
+                    {errors.diabetesType ||
+                      'Click the help icons (?) for more information about each type'}
                   </FormHelperText>
                 </FormControl>
               </Grid>
@@ -269,7 +285,12 @@ export function PatientForm({
                   <Select
                     label="Activity Level"
                     value={formData.activityLevel}
-                    onChange={(e) => handleInputChange('activityLevel', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange(
+                        'activityLevel',
+                        e.target.value as PatientFormData['activityLevel'],
+                      )
+                    }
                   >
                     <MenuItem value="Low">Low</MenuItem>
                     <MenuItem value="Moderate">Moderate</MenuItem>
@@ -288,9 +309,11 @@ export function PatientForm({
                 />
               </Grid>
             </Grid>
-            
+
             {/* Medications */}
-            <Typography variant="h6" gutterBottom>Medications</Typography>
+            <Typography variant="h6" gutterBottom>
+              Medications
+            </Typography>
             {formData.usualMedications.map((med, idx) => (
               <Grid container spacing={2} alignItems="center" key={idx} mb={1}>
                 <Grid item xs={12} md={4}>
@@ -324,9 +347,9 @@ export function PatientForm({
                   />
                 </Grid>
                 <Grid item xs={12} md={1}>
-                  <IconButton 
-                    color="error" 
-                    onClick={() => removeMedication(idx)} 
+                  <IconButton
+                    color="error"
+                    onClick={() => removeMedication(idx)}
                     disabled={formData.usualMedications.length === 1}
                   >
                     <DeleteIcon />
@@ -339,7 +362,7 @@ export function PatientForm({
                 Add Medication
               </Button>
             </Box>
-            
+
             {/* Submit */}
             <Box display="flex" justifyContent="flex-end" gap={2}>
               <Button variant="outlined" color="secondary" onClick={onCancel}>
@@ -354,4 +377,4 @@ export function PatientForm({
       </Container>
     </Box>
   );
-} 
+}

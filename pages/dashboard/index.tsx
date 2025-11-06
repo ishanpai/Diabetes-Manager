@@ -7,10 +7,8 @@ import { ErrorDisplay } from '@/components/ui/ErrorDisplay';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import { usePatients } from '@/hooks/usePatients';
-import {
-  getDiabetesTypeColor,
-  getGlucoseStatusColor,
-} from '@/utils/patientUtils';
+import { logger } from '@/lib/logger';
+import { getDiabetesTypeColor, getGlucoseStatusColor } from '@/utils/patientUtils';
 import { formatDate } from '@/utils/uiUtils';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -49,7 +47,7 @@ export default function Dashboard() {
       // Refresh the patients list
       refetch();
     } catch (err) {
-      console.error('Error deleting patient:', err);
+      logger.error('Error deleting patient:', err);
       alert('Failed to delete patient. Please try again.');
     }
   };
@@ -92,32 +90,29 @@ export default function Dashboard() {
         />
       ) : patients.length === 1 ? (
         // Show detailed view for single patient
-        <Card sx={{
-          p: 4,
-          height: '100%',
-          transition: 'all 0.2s ease-in-out',
-        }}
+        <Card
+          sx={{
+            p: 4,
+            height: '100%',
+            transition: 'all 0.2s ease-in-out',
+          }}
         >
-        <PatientDetail 
-          patientId={patients[0].id} 
-          showHeader={true} 
-          showActions={true}
-        />
+          <PatientDetail patientId={patients[0].id} showHeader={true} showActions={true} />
         </Card>
       ) : (
         // Show summary cards for multiple patients
         <Grid container spacing={3}>
           {patients.map((patient) => (
             <Grid item xs={12} md={6} lg={4} key={patient.id}>
-              <Card 
-                sx={{ 
-                  height: '100%', 
+              <Card
+                sx={{
+                  height: '100%',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease-in-out',
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: 4,
-                  }
+                  },
                 }}
                 onClick={() => router.push(`/patients/${patient.id}`)}
               >
@@ -203,4 +198,4 @@ export default function Dashboard() {
       )}
     </Container>
   );
-} 
+}
