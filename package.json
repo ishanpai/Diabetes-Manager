@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node .next/standalone/server.js",
-    "railway:start": "npx drizzle-kit migrate && node .next/standalone/server.js",
+    "start": "HOSTNAME=${HOSTNAME:-0.0.0.0} PORT=${PORT:-8080} node .next/standalone/server.js",
+    "railway:start": "npx drizzle-kit migrate && HOSTNAME=${HOSTNAME:-0.0.0.0} PORT=${PORT:-8080} node .next/standalone/server.js",
     "railway:migrate": "npx drizzle-kit migrate",
     "lint": "eslint .",
     "format": "prettier --write .",
